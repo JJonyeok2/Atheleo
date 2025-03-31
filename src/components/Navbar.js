@@ -28,6 +28,8 @@ const NavLink = styled(Link)` /* a 태그 대신 Link 사용 */
   text-decoration: none;
   cursor: pointer;
   padding: 1rem 1rem;
+  font-size: 16px;
+  line-height:1.5;
   &:hover {
     text-decoration: underline;
   }

@@ -8,7 +8,7 @@ import Subscribe from './pages/Subscribe'; // pages 폴더에 위치할 경우
 import Navbar from './components/Navbar'; // Navbar 컴포넌트 임포트
 import GlobalStyle from './styles/globalStyles'; // 경로 확인
 import BodyAnalysis from './components/BodyAnalysis'; // AI로 체형 분석 페이지 임포트
-import ExerciseAI from './components/ExerciseAI'; // AI로 운동하기 페이지 임포트
+import ExerciseAI from './pages/ExerciseAI'; // AI로 운동하기 페이지 임포트
 
 const App = () => {
   const handleScrollTo = (section) => {

@@ -1,7 +1,6 @@
-// src/Navbar.js
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
 
 const Nav = styled.nav`
   display: flex;
@@ -14,7 +13,7 @@ const Nav = styled.nav`
   top: 0;
   width: 100%;
   z-index: 1000;
-  border-bottom: 1px solid white; /* 얇은 하얀 실선 추가 */
+  border-bottom: 1px solid white;
 `;
 
 const NavLinks = styled.div`
@@ -23,13 +22,13 @@ const NavLinks = styled.div`
   margin-right: 2rem;
 `;
 
-const NavLink = styled(Link)` /* a 태그 대신 Link 사용 */
+const NavLink = styled(Link)`
   color: white;
   text-decoration: none;
   cursor: pointer;
   padding: 1rem 1rem;
   font-size: 16px;
-  line-height:1.5;
+  line-height: 1.5;
   &:hover {
     text-decoration: underline;
   }
@@ -38,23 +37,23 @@ const NavLink = styled(Link)` /* a 태그 대신 Link 사용 */
 const Sidebar = styled.div`
   position: fixed;
   top: 0;
-  right: ${({ isVisible }) => (isVisible ? '0' : '-300px')}; /* 사이드 바가 보이는지에 따라 위치 결정 */
-  width: 250px; /* 사이드 바 너비 */
-  height: 100vh; /* 화면 전체 높이 */
-  background-color: #222; /* 사이드 바 배경색 */
-  color: white; /* 텍스트 색상 흰색 */
-  padding: 20px; /* 내부 여백 */
-  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5); /* 그림자 효과 */
-  transition: right 0.3s ease; /* 부드러운 전환 효과 */
-  z-index: 999; /* 네비게이션 바 아래에 위치하도록 설정 */
-  overflow-y: auto; /* 스크롤 가능하게 설정 */
+  right: ${({ isVisible }) => (isVisible ? '0' : '-300px')};
+  width: 250px;
+  height: 100vh;
+  background-color: #222;
+  color: white;
+  padding: 20px;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
+  transition: right 0.3s ease;
+  z-index: 999;
+  overflow-y: auto;
 `;
 
-const SidebarLink = styled(Link)` /* a 태그 대신 Link 사용 */
+const SidebarLink = styled(Link)`
   display: block;
   color: white;
   text-decoration: none;
-  margin: 15px 0; /* 링크 간격 조정 */
+  margin: 15px 0;
   &:hover {
     text-decoration: underline;
   }
@@ -65,52 +64,76 @@ const HamburgerButton = styled.button`
   border: none;
   cursor: pointer;
   padding: 10px;
-  margin-left: 20px; /* 네비게이션 링크와 간격 */
+  margin-left: 20px;
 `;
 
 const Line = styled.div`
-  width: 25px; /* 선의 너비 */
-  height: 3px; /* 선의 높이 */
-  background-color: white; /* 선의 색상 */
-  margin: 4px 0; /* 선 간격 */
-  transition: all 0.3s ease; /* 부드러운 전환 효과 */
+  width: 25px;
+  height: 3px;
+  background-color: white;
+  margin: 4px 0;
+  transition: all 0.3s ease;
 `;
 
-const Navbar = ({ onScrollTo }) => {
-  const [isVisible, setIsVisible] = useState(false); // 사이드 바의 가시성 상태
-  const location = useLocation(); // 현재 경로를 얻기 위해 useLocation 훅 사용
+/**
+ * NavLinkWrapper 컴포넌트
+ * - 홈(/)에서는 onScrollTo(section) 실행
+ * - 다른 페이지에서는 "/"로 이동
+ */
+const NavLinkWrapper = ({ section, onScrollTo, children }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const toggleSidebar = () => {
-    setIsVisible(!isVisible); // 사이드 바 가시성 토글
+  const handleClick = (e) => {
+    if (location.pathname === '/' && onScrollTo) {
+      e.preventDefault(); // 링크 이동 막고
+      onScrollTo(section);
+    } else {
+      navigate('/'); // 다른 페이지면 홈으로 이동
+    }
   };
+
+  return (
+    <NavLink to={location.pathname === '/' ? '#' : '/'} onClick={handleClick}>
+      {children}
+    </NavLink>
+  );
+};
+
+const Navbar = ({ onScrollTo }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const location = useLocation();
+
+  const toggleSidebar = () => setIsVisible(!isVisible);
+
+  const isAuthPage = ['/login', '/signup', '/subscribe'].includes(location.pathname);
 
   return (
     <>
       <Nav>
         <Link to="/" style={{ color: 'white', textDecoration: 'none' }}>Atheleo</Link>
         <NavLinks>
-          {location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/subscribe' ? (
-            <NavLink to="/">홈</NavLink> // 홈 버튼만 보여줌
+          {isAuthPage ? (
+            <NavLink to="/">홈</NavLink>
           ) : (
             <>
-              <NavLink onClick={() => onScrollTo('history')}>연혁</NavLink>
-              <NavLink onClick={() => onScrollTo('about')}>About Us</NavLink>
-              <NavLink onClick={() => onScrollTo('atheleo')}>Atheleo AI</NavLink>
+              <NavLinkWrapper section="history" onScrollTo={onScrollTo}>연혁</NavLinkWrapper>
+              <NavLinkWrapper section="about" onScrollTo={onScrollTo}>About Us</NavLinkWrapper>
+              <NavLinkWrapper section="atheleo" onScrollTo={onScrollTo}>Atheleo AI</NavLinkWrapper>
               <NavLink to="/login">로그인</NavLink>
               <NavLink to="/subscribe">구독하기</NavLink>
             </>
           )}
           <HamburgerButton onClick={toggleSidebar}>
-            <Line />
-            <Line />
-            <Line />
+            <Line /><Line /><Line />
           </HamburgerButton>
         </NavLinks>
       </Nav>
+
       <Sidebar isVisible={isVisible}>
-        <h3 style={{ marginBottom: '50px' }}>사이드 바</h3> {/* 제목 아래 여백 추가 */}
-        <SidebarLink to="/body-analysis">AI 체형 분석</SidebarLink> {/* 링크 수정 */}
-        <SidebarLink to="/exercise-ai">AI 운동하기</SidebarLink> {/* 링크 수정 */}
+        <h3 style={{ marginBottom: '50px' }}>사이드 바</h3>
+        <SidebarLink to="/body-analysis">AI 체형 분석</SidebarLink>
+        <SidebarLink to="/exercise-ai">AI 운동하기</SidebarLink>
       </Sidebar>
     </>
   );

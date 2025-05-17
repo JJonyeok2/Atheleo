@@ -1,6 +1,7 @@
 // src/Signup.js
 import React, { useState } from 'react';
 import styled from 'styled-components';
+import axios from 'axios';  // axios 임포트 추가
 
 const Container = styled.div`
   display: flex;
@@ -67,10 +68,35 @@ const Signup = () => {
   const [smsConsent, setSmsConsent] = useState(false);
   const [emailConsent, setEmailConsent] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // 회원가입 처리 로직 추가
-    console.log('회원가입 시도:', { name, birthdate, phone, email, id, password, privacyConsent, smsConsent, emailConsent });
+
+    if (!privacyConsent) {
+      alert('개인정보 처리방침에 동의해야 회원가입이 가능합니다.');
+      return;
+    }
+
+    try {
+      const response = await axios.post('http://98.82.223.129:8000/api/signup/', {
+        username: id,
+        password: password,
+        email: email,
+        birthdate: birthdate,
+        phone: phone,
+        privacyConsent: privacyConsent,
+        smsConsent: smsConsent,
+        emailConsent: emailConsent,
+        name: name,
+      });
+
+      alert('회원가입 성공!');
+      console.log(response.data);
+      // 회원가입 후 추가 행동(예: 로그인 페이지 이동) 여기에 추가 가능
+
+    } catch (error) {
+      console.error(error.response?.data || error.message);
+      alert('회원가입 실패: ' + (error.response?.data?.error || error.message));
+    }
   };
 
   return (
@@ -119,12 +145,13 @@ const Signup = () => {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
-        
+
         <CheckboxContainer>
           <Checkbox
             type="checkbox"
             checked={privacyConsent}
             onChange={() => setPrivacyConsent(!privacyConsent)}
+            required
           />
           <Label>개인정보 처리방침에 동의합니다.</Label>
         </CheckboxContainer>

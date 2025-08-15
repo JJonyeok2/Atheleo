@@ -1,117 +1,115 @@
+import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
-import styled from 'styled-components';
+import { Alert } from 'react-native';
+import styled from 'styled-components/native';
 
-const Container = styled.div`
-  min-height: 100vh;
+const Container = styled.View`
+  flex: 1;
   padding: 40px 20px;
   background-color: #121212;
-  color: white;
-  display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: flex-start;
 `;
 
-const Title = styled.h2`
+const Title = styled.Text`
+  font-size: 24px;
+  color: white;
+  font-weight: bold;
   margin-bottom: 30px;
 `;
 
-const Form = styled.form`
+const Form = styled.View`
   width: 320px;
   background-color: #222;
   padding: 25px;
   border-radius: 8px;
-  box-shadow: 0 0 10px #000000aa;
-  display: flex;
-  flex-direction: column;
 `;
 
-const Input = styled.input`
+const Input = styled.TextInput`
+  color: white;
+  background-color: #333;
   margin-bottom: 18px;
   padding: 10px;
   border-radius: 5px;
-  border: none;
-  outline: none;
-  font-size: 1rem;
+  font-size: 16px;
 `;
 
-const Button = styled.button`
+const Button = styled.TouchableOpacity`
   padding: 12px;
   border-radius: 5px;
-  border: none;
   background-color: #28a745;
+  align-items: center;
+  margin-top: 10px;
+`;
+
+const ButtonText = styled.Text`
   color: white;
   font-weight: bold;
-  cursor: pointer;
-  margin-top: 10px;
-  &:hover {
-    background-color: #218838;
-  }
+  font-size: 16px;
 `;
 
 const Payment = () => {
-  const navigate = useNavigate();
+  const navigation = useNavigation();
 
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvc, setCvc] = useState('');
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
+  const handleSubmit = () => {
     // 결제 처리 로직 예시 (실제 결제 API 연동 필요)
     if (!cardNumber || !cardHolder || !expiry || !cvc) {
-      alert('모든 결제 정보를 입력해주세요.');
+      Alert.alert('입력 오류', '모든 결제 정보를 입력해주세요.');
       return;
     }
 
     // 간단한 유효성 체크 (실제론 더 엄격히 체크 필요)
     if (cardNumber.length < 12 || cardNumber.length > 19) {
-      alert('유효한 카드 번호를 입력해주세요.');
+      Alert.alert('입력 오류', '유효한 카드 번호를 입력해주세요.');
       return;
     }
 
-    alert('결제가 완료되었습니다. 구독 서비스 이용을 환영합니다!');
-    navigate('/'); // 결제 완료 후 홈페이지로 이동
+    Alert.alert('성공', '결제가 완료되었습니다. 구독 서비스 이용을 환영합니다!');
+    navigation.navigate('HomeScreen'); // 결제 완료 후 홈 화면으로 이동
   };
 
   return (
     <Container>
       <Title>구독 결제</Title>
-      <Form onSubmit={handleSubmit}>
+      <Form>
         <Input
-          type="text"
           placeholder="카드 번호 (숫자만 입력)"
+          placeholderTextColor="#aaa"
           value={cardNumber}
-          onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, ''))} // 숫자만 입력
+          onChangeText={(text) => setCardNumber(text.replace(/\D/g, ''))}
+          keyboardType="numeric"
           maxLength={19}
-          required
         />
         <Input
-          type="text"
           placeholder="카드 소유자 이름"
+          placeholderTextColor="#aaa"
           value={cardHolder}
-          onChange={(e) => setCardHolder(e.target.value)}
-          required
+          onChangeText={setCardHolder}
         />
         <Input
-          type="text"
           placeholder="만료일 (MM/YY)"
+          placeholderTextColor="#aaa"
           value={expiry}
-          onChange={(e) => setExpiry(e.target.value)}
+          onChangeText={setExpiry}
           maxLength={5}
-          required
         />
         <Input
-          type="password"
           placeholder="CVC"
+          placeholderTextColor="#aaa"
           value={cvc}
-          onChange={(e) => setCvc(e.target.value.replace(/\D/g, ''))} // 숫자만
+          onChangeText={(text) => setCvc(text.replace(/\D/g, ''))}
+          keyboardType="numeric"
+          secureTextEntry
           maxLength={4}
-          required
         />
-        <Button type="submit">결제하기</Button>
+        <Button onPress={handleSubmit}>
+          <ButtonText>결제하기</ButtonText>
+        </Button>
       </Form>
     </Container>
   );

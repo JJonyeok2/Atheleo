@@ -43,7 +43,7 @@ const Signup = () => {
       navigation.navigate('Login'); // Assuming 'Login' is the name of your login screen route
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        // More specific error handling for backend validation errors
+        // 백엔드 유효성 검사 오류에 대한 보다 구체적인 오류 처리
         if (error.response && error.response.data) {
           const errorMessages = Object.values(error.response.data).flat().join('\n');
           Alert.alert('회원가입 실패', errorMessages);

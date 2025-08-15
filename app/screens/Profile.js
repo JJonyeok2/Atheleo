@@ -192,10 +192,10 @@ const Profile = () => {
       });
       setProfile(res.data); // 서버로부터 업데이트된 프로필 정보 수신
       setNewImage(null); // 새 이미지 상태 초기화
-      Alert.alert('Success', 'Profile updated successfully.');
+      Alert.alert('성공', '프로필이 성공적으로 업데이트되었습니다.');
     } catch (error) {
       console.error('Failed to update profile:', error.response?.data || error.message);
-      Alert.alert('Error', 'Failed to update profile.');
+      Alert.alert('오류', '프로필을 업데이트하지 못했습니다.');
     }
   };
 

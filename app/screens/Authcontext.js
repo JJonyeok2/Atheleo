@@ -1,4 +1,4 @@
-// app/context/AuthContext.js
+// 인증 컨텍스트
 import React, { createContext, useContext, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // AsyncStorage 임포트
 
@@ -44,3 +44,5 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+
+export default AuthProvider;

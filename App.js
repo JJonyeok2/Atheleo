@@ -1,11 +1,13 @@
-import { NavigationContainer, useNavigation } from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Feather } from '@expo/vector-icons'; // 아이콘 임포트 추가
 
-import { AuthProvider, useAuth } from './app/screens/Authcontext';
 import HomeScreen from './app/HomeScreen';
+import { AuthProvider, useAuth } from './app/screens/Authcontext';
 import BodyAnalysisAI from './app/screens/BodyAnalysisAI';
+import ExerciseAIScreen from './app/screens/ExerciseAIScreen';
 import ExerciseWithAI from './app/screens/ExerciseWithAI';
 import Login from './app/screens/Login';
 import Payment from './app/screens/Payment';
@@ -15,8 +17,7 @@ import Subscribe from './app/screens/Subscribe';
 
 const Stack = createNativeStackNavigator();
 
-function HeaderTitle() {
-    const navigation = useNavigation();
+function HeaderTitle({ navigation }) {
     return (
         <TouchableOpacity onPress={() => navigation.popToTop()}>
             <Text style={styles.headerTitle}>Atheleo</Text>
@@ -24,11 +25,8 @@ function HeaderTitle() {
     );
 }
 
-function HeaderRightButtons() {
+function HeaderRightButtons({ navigation }) {
     const { isLoggedIn, logout } = useAuth();
-    const navigation = useNavigation();
-
-    console.log('HeaderRightButtons - isLoggedIn:', isLoggedIn); // 디버깅용
 
     const handleLogout = () => {
         logout();
@@ -37,33 +35,14 @@ function HeaderRightButtons() {
 
     return (
         <View style={styles.headerButtonsContainer}>
-            <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('ExerciseWithAI')}>
-                <Text style={styles.buttonText}>AI 운동하기</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('BodyAnalysisAI')}>
-                <Text style={styles.buttonText}>체형 분석</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Subscribe')}>
-                <Text style={styles.buttonText}>구독하기</Text>
-            </TouchableOpacity>
-            {!isLoggedIn ? (
-                <>
-                    <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Login')}>
-                        <Text style={styles.buttonText}>로그인</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Signup')}>
-                        <Text style={styles.buttonText}>회원가입</Text>
-                    </TouchableOpacity>
-                </>
+            {isLoggedIn ? (
+                <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Profile')}>
+                    <Feather name="user" size={24} color="#007bff" />
+                </TouchableOpacity>
             ) : (
-                <>
-                    <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Profile')}>
-                        <Text style={styles.buttonText}>프로필</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.button} onPress={handleLogout}>
-                        <Text style={styles.buttonText}>로그아웃</Text>
-                    </TouchableOpacity>
-                </>
+                <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Login')}>
+                    <Text style={styles.buttonText}>로그인</Text>
+                </TouchableOpacity>
             )}
         </View>
     );
@@ -73,14 +52,14 @@ function AppNavigator() {
   return (
     <Stack.Navigator
         initialRouteName="Home"
-        screenOptions={{
-            headerTitle: () => <HeaderTitle />,
-            headerBackVisible: false, // 뒤로가기 버튼 숨기기
+        screenOptions={({ navigation }) => ({
+            headerTitle: () => <HeaderTitle navigation={navigation} />,
+            headerBackVisible: false,
             headerTitleAlign: 'left',
-            headerRight: () => <HeaderRightButtons />,
+            headerRight: () => <HeaderRightButtons navigation={navigation} />,
             headerStyle: { backgroundColor: '#f8f9fa' },
             headerTintColor: '#007bff',
-        }}
+        })}
     >
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Login" component={Login} />
@@ -90,6 +69,7 @@ function AppNavigator() {
         <Stack.Screen name="Payment" component={Payment} />
         <Stack.Screen name="ExerciseWithAI" component={ExerciseWithAI} />
         <Stack.Screen name="BodyAnalysisAI" component={BodyAnalysisAI} />
+        <Stack.Screen name="ExerciseAIScreen" component={ExerciseAIScreen} />
     </Stack.Navigator>
   );
 }
@@ -114,8 +94,7 @@ const styles = StyleSheet.create({
     },
     headerButtonsContainer: {
         flexDirection: 'row',
-        gap: 10,
-        marginRight: 10,
+        marginRight: 15,
     },
     button: {
         backgroundColor: '#007bff',
@@ -126,5 +105,13 @@ const styles = StyleSheet.create({
     buttonText: {
         color: '#fff',
         fontWeight: 'bold',
-    }
+    },
+    iconButton: {
+        paddingHorizontal: 10,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
 });

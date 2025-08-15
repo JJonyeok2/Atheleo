@@ -7,7 +7,8 @@
     "icon": "./assets/images/icon.png",
     "scheme": "atheleonative",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "jsEngine": "jsc",
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },
@@ -16,7 +17,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.atheleo_native"
     },
     "web": {
       "bundler": "metro",
@@ -33,7 +35,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

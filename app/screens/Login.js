@@ -181,7 +181,7 @@ const Login = () => {
   );
 };
 
-// Default export
+// 기본 내보내기
 export default Login;
 
 // Named export도 추가 (선택사항)

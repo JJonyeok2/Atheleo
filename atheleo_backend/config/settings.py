@@ -114,17 +114,19 @@ STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Default primary key field type
+# 기본 기본 키 필드 유형
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ✅ CORS 설정
-# CORS_ALLOW_ALL_ORIGINS = True # 개발 초기엔 True로 설정하여 모든 요청을 허용할 수 있음
+CORS_ALLOW_ALL_ORIGINS = True # 개발 초기엔 True로 설정하여 모든 요청을 허용할 수 있음
 
 # 특정 출처만 허용하도록 설정 (보안상 권장)
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8081", # Expo Web
-    "http://localhost:19006", # Expo Web (대체 포트)
+    "http://localhost:8082", # Expo Web (current)
+    "http://localhost:19006", # Expo Web (alternative)
     "http://127.0.0.1:8081",
+    "http://127.0.0.1:8082", # Expo Web (current)
     "http://127.0.0.1:19006",
     f"http://{os.environ.get('IP_ADDRESS')}:8081", # 동적 IP 지원
     f"http://{os.environ.get('IP_ADDRESS')}:19006",

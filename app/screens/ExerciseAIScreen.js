@@ -27,7 +27,100 @@ const ALL_EXERCISES_FLAT = Object.values(CATEGORIZED_EXERCISES).reduce((acc, cat
 // 테스트용 더미 Base64 이미지 (1x1 픽셀 검은색 이미지)
 // 실제 카메라가 작동하지 않을 때 AI 분석 로직 테스트용으로 사용됩니다.
 // 실제 카메라 사용 시에는 이 부분을 제거하거나 주석 처리하세요.
-const TEST_IMAGE_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+const ALL_EXERCISES_FLAT = Object.values(CATEGORIZED_EXERCISES).reduce((acc, category) => {
+  return { ...acc, ...category };
+}, {});
+
+// 백엔드 API 주소
+const API_URL = 'http://10.0.2.2:8000/api/exercise/analyze-exercise/';
+
+export default function ExerciseAIScreen() {
+  const [hasPermission, setHasPermission] = useState(null);
+  const [currentExercise, setCurrentExercise] = useState(
+    Object.keys(CATEGORIZED_EXERCISES.UPPER_BODY).length > 0
+      ? Object.keys(CATEGORIZED_EXERCISES.UPPER_BODY)[0]
+      : null // 상체 운동이 없으면 null로 초기화
+  ); // 첫 번째 상체 운동으로 초기화
+  const [selectedCategory, setSelectedCategory] = useState(null); // 선택된 카테고리 상태 추가
+  const [feedback, setFeedback] = useState('자세를 잡아주세요...');
+  const [score, setScore] = useState(0);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [showExerciseModal, setShowExerciseModal] = useState(false); // 모달 표시 여부 상태 추가
+  const isFocused = useIsFocused();
+  
+  const cameraRef = useRef(null);
+
+  // 1. 카메라 권한 요청
+  useEffect(() => {
+    if (isFocused) {
+      InteractionManager.runAfterInteractions(async () => {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        setHasPermission(status === 'granted');
+      });
+    }
+  }, [isFocused]);
+
+  const onCameraReady = () => {
+    setIsCameraReady(true);
+  };
+
+  // 2. 자세 분석 루프 (setTimeout 재귀 사용)
+  useEffect(() => {
+    let timeoutId;
+
+    const startAnalysisLoop = async () => {
+      if (!isAnalyzing) { // 이미 분석 중이 아니라면
+        await analyzePose(); // 분석 완료까지 기다림
+      }
+      timeoutId = setTimeout(startAnalysisLoop, 2000); // 2초 후 다시 호출
+    };
+
+    // 컴포넌트가 마운트될 때 루프 시작
+    startAnalysisLoop();
+
+    // 컴포넌트 언마운트 시 타이머 정리
+    return () => clearTimeout(timeoutId);
+  }, [currentExercise]); // isAnalyzing 의존성 제거
+
+  // 3. 백엔드에 자세 분석을 요청하는 함수
+  const analyzePose = async () => {
+    if (cameraRef.current) {
+      setIsAnalyzing(true);
+      try {
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.5,
+          base64: true,
+        });
+
+        // 백엔드로 데이터 전송
+        const response = await axios.post(API_URL, {
+          image: `data:image/jpeg;base64,${photo.base64}`,
+          exercise_type: currentExercise,
+        });
+
+        // 결과 업데이트
+        setFeedback(response.data.feedback);
+        setScore(response.data.score);
+
+      } catch (error) {
+        console.error("An error occurred during analysis:", error);
+        let errorMessage = '분석 중 오류가 발생했습니다.';
+        if (error.response) {
+            // 서버가 응답을 보냈지만, 상태 코드가 2xx가 아님
+            console.error("Backend Error:", error.response.data);
+            errorMessage = `서버 오류: ${error.response.data.error || '알 수 없는 오류'}`;
+        } else if (error.request) {
+            // 요청이 이루어졌으나 응답을 받지 못함
+            console.error("No response from server:", error.request);
+            errorMessage = '서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인하세요.';
+        }
+        setFeedback(errorMessage);
+      } finally {
+        setIsAnalyzing(false);
+      }
+    }
+  };
 
 // 백엔드 API 주소
 const API_URL = 'http://10.0.2.2:8000/api/exercise/analyze-exercise/';

@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.anonymous.atheleo_native.app-mergeDebugResources-68:/values-night-v33/values-night-v33.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\jacob\\.gradle\\caches\\8.13\\transforms\\ed280626aa95171682096e5872c6af69\\transformed\\core-splashscreen-1.2.0-alpha02\\res\\values-night-v33\\values-night-v33.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "4",
+                        "endColumns": "12",
+                        "endOffsets": "215"
+                    }
+                }
+            ]
+        }
+    ]
+}

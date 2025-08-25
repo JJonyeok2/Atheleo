@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.anonymous.atheleo_native.app-mergeDebugResources-68:/values-night-v27/values-night-v27.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\jacob\\Atheleo\\node_modules\\react-native-edge-to-edge\\android\\build\\intermediates\\packaged_res\\debug\\packageDebugResources\\values-night-v27\\values-night-v27.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "51",
+                        "endOffsets": "102"
+                    }
+                }
+            ]
+        }
+    ]
+}

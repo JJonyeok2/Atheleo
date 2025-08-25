@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.anonymous.atheleo_native.app-mergeDebugResources-68:/values-zh/values-zh.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\jacob\\.gradle\\caches\\8.13\\transforms\\35a00de50ceac9bdbb8fc43812824536\\transformed\\android-image-cropper-4.6.0\\res\\values-zh\\values-zh.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8",
+                        "startColumns": "4,4,4,4,4,4,4",
+                        "startOffsets": "55,107,149,206,261,313,363",
+                        "endColumns": "51,41,56,54,51,49,57",
+                        "endOffsets": "102,144,201,256,308,358,416"
+                    }
+                }
+            ]
+        }
+    ]
+}

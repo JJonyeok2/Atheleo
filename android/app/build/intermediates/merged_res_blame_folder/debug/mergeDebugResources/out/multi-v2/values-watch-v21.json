@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.anonymous.atheleo_native.app-mergeDebugResources-68:/values-watch-v21/values-watch-v21.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\jacob\\.gradle\\caches\\8.13\\transforms\\4bf03df1e227318d4ab7c4ce04613cbc\\transformed\\appcompat-1.7.0\\res\\values-watch-v21\\values-watch-v21.xml",
+                    "from": {
+                        "startLines": "2,6,10",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,271,499",
+                        "endLines": "5,9,13",
+                        "endColumns": "12,12,12",
+                        "endOffsets": "266,494,724"
+                    }
+                }
+            ]
+        }
+    ]
+}

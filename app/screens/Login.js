@@ -52,7 +52,7 @@ const Login = () => {
     try {
       console.log('로그인 시도:', { id, password });
       
-      const response = await axios.post('http://127.0.0.1:8000/api/users/login/', {
+      const response = await axios.post('http://172.30.1.13:8000/api/users/login/', {
         username: id,
         password,
       });
@@ -183,9 +183,6 @@ const Login = () => {
 
 // 기본 내보내기
 export default Login;
-
-// Named export도 추가 (선택사항)
-export { Login };
 
 const styles = StyleSheet.create({
   container: {

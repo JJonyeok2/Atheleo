@@ -21,13 +21,24 @@ const Subscribe = () => {
     setSelectedPlan(type);
     switch (type) {
       case 'FREE':
-        setBenefitDescription('기본 구독: 무료로 제공되는 체형 분석 기능만 이용할 수 있습니다.');
+        setBenefitDescription(
+          '기본 구독: 무료로 제공되는 체형 분석 기능만 이용할 수 있습니다.'
+        );
+        break;
+      case 'TRIAL':
+        setBenefitDescription(
+          '체험 구독: 7일 동안 체형 분석과 운동 보조 기능을 무료로 이용할 수 있습니다.'
+        );
         break;
       case 'STANDARD':
-        setBenefitDescription('Standard 구독: 월 19,900원, 체형 분석 및 운동 보조 기능을 이용할 수 있습니다.');
+        setBenefitDescription(
+          'Standard 구독: 월 19,900원, 체형 분석 및 운동 보조 기능을 이용할 수 있습니다.'
+        );
         break;
       case 'PRO':
-        setBenefitDescription('Pro 구독: 월 29,900원, 스탠다드 옵션에 추가로 1:1 운동 피드백 서비스를 제공합니다.');
+        setBenefitDescription(
+          'Pro 구독: 월 29,900원, 스탠다드 옵션에 추가로 1:1 운동 피드백 서비스를 제공합니다.'
+        );
         break;
       default:
         setBenefitDescription('');
@@ -50,7 +61,7 @@ const Subscribe = () => {
 
     try {
       const response = await axios.patch(
-        'http://127.0.0.1:8000/api/users/subscribe/',
+        'http://172.30.1.13:8000/api/users/subscribe/',
         { subscription_type: selectedPlan },
         {
           headers: { Authorization: `Token ${user.token}` },
@@ -80,7 +91,7 @@ const Subscribe = () => {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>구독</Text>
       <View style={styles.options}>
-        {['FREE', 'STANDARD', 'PRO'].map((type, index) => (
+        {['FREE', 'TRIAL', 'STANDARD', 'PRO'].map((type, index) => (
           <View
             key={index}
             style={[
@@ -90,11 +101,13 @@ const Subscribe = () => {
           >
             <Text style={styles.optionTitle}>{String(type)}</Text>
             <Text style={styles.optionPrice}>
-              {String(type === 'FREE'
+              {type === 'FREE'
                 ? '무료'
+                : type === 'TRIAL'
+                ? '7일 무료 체험'
                 : type === 'STANDARD'
                 ? '월 19,900원'
-                : '월 29,900원')}
+                : '월 29,900원'}
             </Text>
             <TouchableOpacity
               style={styles.button}
@@ -106,12 +119,12 @@ const Subscribe = () => {
         ))}
       </View>
 
-      {benefitDescription ? ( // benefitDescription이 비어있지 않으면 렌더링
+      {benefitDescription ? (
         <View style={styles.descriptionBox}>
           <Text style={styles.benefitTitle}>선택한 구독 혜택</Text>
           <Text style={styles.description}>{benefitDescription}</Text>
         </View>
-      ) : null} {/* 비어있으면 null 반환 */}
+      ) : null}
 
       <TouchableOpacity style={styles.submitButton} onPress={handleSubscribe}>
         <Text style={styles.submitText}>구독하기</Text>
@@ -143,7 +156,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#444',
     padding: 16,
     borderRadius: 8,
-    width: '30%',
+    width: '22%',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
@@ -159,6 +172,7 @@ const styles = StyleSheet.create({
   optionPrice: {
     color: '#ccc',
     marginBottom: 10,
+    textAlign: 'center',
   },
   button: {
     backgroundColor: '#007bff',

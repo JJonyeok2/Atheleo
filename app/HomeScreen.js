@@ -1,6 +1,7 @@
+import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import React, { useRef } from 'react';
-import { Animated, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Animated, Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // 각 섹션에 대한 정보를 배열로 정의
 const sections = [
@@ -19,13 +20,13 @@ const sections = [
     key: 'history',
     image: require('../assets/45615.jpg'),
     title: '연혁',
-    texts: ['Atheleo 팀 2025년 3월 10일 구성', '2025년 3월 17일 | 전체 홈페이지 기획', '2025년 3월 24일 | 1차 발표'],
+    texts: ['Atheleo -  Since 2025/3/10 ', '2025년 3월 17일 | 전체 홈페이지 기획', '2025년 3월 24일 | 1차 발표' , '2025년 8월 5일 | 모바일 서비스 전환'],
   },
   {
     key: 'about',
     image: require('../assets/45616.jpg'),
     title: 'About Us',
-    texts: ['팀장 | 전종혁 - ReactNative(JS), AWS서버(EC2)', '부팀장 | 김한수 - AI 개발'],
+    texts: ['팀장 | 전종혁' , '부팀장 | 김한수 '],
   },
   {
     key: 'ai',
@@ -89,11 +90,30 @@ const AnimatedSection = ({ section, scrollY, index }) => {
 
 export default function HomeScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
-  const onScroll = Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true });
+  const scrollViewRef = useRef(null);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
+
+    const onScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: true,
+      listener: (event) => {
+        const { y } = event.nativeEvent.contentOffset;
+        setShowScrollToTop(y > screenHeight / 2);
+      },
+    }
+  );
+
+  const scrollToTop = () => {
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ y: 0, animated: true });
+    }
+  };
 
   return (
     <View style={styles.container}>
       <Animated.ScrollView
+        ref={scrollViewRef}
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
@@ -104,6 +124,11 @@ export default function HomeScreen() {
           <AnimatedSection key={section.key} section={section} scrollY={scrollY} index={index} />
         ))}
       </Animated.ScrollView>
+      {showScrollToTop && (
+        <TouchableOpacity style={styles.scrollToTopButton} onPress={scrollToTop}>
+          <Feather name="arrow-up" size={24} color="white" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -157,5 +182,16 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '600',
+  },
+  scrollToTopButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 30,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

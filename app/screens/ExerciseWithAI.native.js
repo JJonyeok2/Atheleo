@@ -1,7 +1,6 @@
-import { Camera, CameraView } from 'expo-camera';
+import { Camera } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Button, StyleSheet, Text, View, InteractionManager } from 'react-native';
-import { useIsFocused } from '@react-navigation/native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ExerciseWithAI() {
   const cameraRef = useRef(null);
@@ -10,35 +9,26 @@ export default function ExerciseWithAI() {
   const [feedback, setFeedback] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isCameraReady, setIsCameraReady] = useState(false);
-  const isFocused = useIsFocused();
 
-  // State for exercise selection
   const [selectedPart, setSelectedPart] = useState(null);
   const [selectedSubPart, setSelectedSubPart] = useState(null);
   const [selectedExercise, setSelectedExercise] = useState(null);
 
   useEffect(() => {
-    if (isFocused) {
-      InteractionManager.runAfterInteractions(async () => {
-        const { status } = await Camera.requestCameraPermissionsAsync();
-        setHasPermission(status === 'granted');
-      });
-    }
-  }, [isFocused]);
-
-  const onCameraReady = () => {
-    setIsCameraReady(true);
-  };
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+    })();
+  }, []);
 
   useEffect(() => {
     let interval;
     if (isRunning && cameraRef.current) {
       const execute = () => {
-        if (cameraRef.current) captureAndSend();
+        captureAndSend();
       };
-      execute(); // Run immediately
-      interval = setInterval(execute, 2000); // Then every 2 seconds
+      execute(); 
+      interval = setInterval(execute, 2000); 
     }
     return () => clearInterval(interval);
   }, [isRunning]);
@@ -47,17 +37,14 @@ export default function ExerciseWithAI() {
     if (!cameraRef.current || !selectedExercise) return;
     try {
       setIsLoading(true);
-      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.6 });
+      const photo = await cameraRef.current.takePictureAsync({ base64: true });
+      if (!photo?.base64) return;
 
-      const res = await fetch('http://172.30.1.9:8000/api/exercise-score/', {
+      const res = await fetch('http://127.0.0.1:8000/api/exercise-score/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image: photo.base64,
-          exercise: selectedExercise, // 예: 'bicep_curl'
-        }),
+        body: JSON.stringify({ image: photo.base64, exercise: selectedExercise }),
       });
-
       const result = await res.json();
       setScore(result.score);
       setFeedback(result.feedback);
@@ -74,175 +61,104 @@ export default function ExerciseWithAI() {
     setSelectedExercise(null);
     setScore(null);
     setFeedback('');
+    setIsRunning(false);
   };
 
   const handleStartStop = () => {
-    if (isRunning) {
-      setIsRunning(false);
-      resetSelection();
-    } else if (selectedExercise) {
-      setIsRunning(true);
-    }
+    if (isRunning) resetSelection();
+    else if (selectedExercise) setIsRunning(true);
   };
 
   const renderSelectionControls = () => {
-    if (isRunning) {
+    if (!isRunning) {
       return (
-        <Button
-          title="Stop AI Tracking"
-          onPress={handleStartStop}
-          disabled={isLoading}
-          color="red"
-        />
+        <ScrollView style={styles.selectionContainer}>
+          {!selectedPart && (
+            <>
+              <Text style={styles.selectionText}>1. 운동 부위를 선택하세요.</Text>
+              <View style={styles.buttonGroup}>
+                <TouchableOpacity style={styles.btn} onPress={() => setSelectedPart('upper')}><Text style={styles.btnText}>상체</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.btn} onPress={() => setSelectedPart('lower')}><Text style={styles.btnText}>하체</Text></TouchableOpacity>
+              </View>
+            </>
+          )}
+          {selectedPart && !selectedSubPart && (
+            <>
+              <Text style={styles.selectionText}>2. 세부 부위를 선택하세요.</Text>
+              <View style={styles.buttonGroup}>
+                {selectedPart === 'upper' && <>
+                  <TouchableOpacity style={styles.btn} onPress={() => setSelectedSubPart('arm')}><Text style={styles.btnText}>팔</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.btn} onPress={() => setSelectedSubPart('shoulder')}><Text style={styles.btnText}>어깨</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.btn} onPress={() => setSelectedSubPart('chest')}><Text style={styles.btnText}>가슴</Text></TouchableOpacity>
+                </>}
+                {selectedPart === 'lower' && <>
+                  <TouchableOpacity style={styles.btn} onPress={() => setSelectedSubPart('leg')}><Text style={styles.btnText}>다리</Text></TouchableOpacity>
+                </>}
+              </View>
+              <TouchableOpacity style={styles.backBtn} onPress={() => setSelectedPart(null)}><Text style={styles.backBtnText}>뒤로</Text></TouchableOpacity>
+            </>
+          )}
+          {selectedSubPart && !selectedExercise && (
+            <>
+              <Text style={styles.selectionText}>3. 운동을 선택하세요.</Text>
+              <View style={styles.buttonGroup}>
+                {selectedSubPart === 'arm' && <>
+                  <TouchableOpacity style={styles.btn} onPress={() => setSelectedExercise('bicep_curl')}><Text style={styles.btnText}>이두 컬</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.btn} onPress={() => setSelectedExercise('tricep_extension')}><Text style={styles.btnText}>삼두 익스텐션</Text></TouchableOpacity>
+                </>}
+                {selectedSubPart === 'leg' && <>
+                  <TouchableOpacity style={styles.btn} onPress={() => setSelectedExercise('squat')}><Text style={styles.btnText}>스쿼트</Text></TouchableOpacity>
+                </>}
+              </View>
+              <TouchableOpacity style={styles.backBtn} onPress={() => setSelectedSubPart(null)}><Text style={styles.backBtnText}>뒤로</Text></TouchableOpacity>
+            </>
+          )}
+          {selectedExercise && (
+            <>
+              <TouchableOpacity style={styles.startBtn} onPress={handleStartStop}><Text style={styles.startBtnText}>운동 시작</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.backBtn} onPress={resetSelection}><Text style={styles.backBtnText}>선택 초기화</Text></TouchableOpacity>
+            </>
+          )}
+        </ScrollView>
       );
-    }
-
-    if (!selectedPart) {
+    } else {
       return (
-        <View style={styles.selectionContainer}>
-          <Text style={styles.selectionText}>1. 운동 부위를 선택하세요.</Text>
-          <View style={styles.buttonGroup}>
-            <Button title="상체" onPress={() => setSelectedPart('upper')} />
-            <Button title="하체" onPress={() => setSelectedPart('lower')} />
-          </View>
+        <View style={styles.runningContainer}>
+          <TouchableOpacity style={styles.stopBtn} onPress={handleStartStop}><Text style={styles.stopBtnText}>운동 종료</Text></TouchableOpacity>
+          {score !== null && <Text style={[styles.score, { color: score >= 80 ? 'green' : 'red' }]}>🏅 {score}점</Text>}
+          {feedback && <Text style={styles.feedback}>💬 {feedback}</Text>}
         </View>
       );
     }
-
-    if (!selectedSubPart) {
-      if (selectedPart === 'upper') {
-        return (
-          <View style={styles.selectionContainer}>
-            <Text style={styles.selectionText}>2. 세부 부위를 선택하세요.</Text>
-            <View style={styles.buttonGroup}>
-              <Button title="팔" onPress={() => setSelectedSubPart('arm')} />
-              <Button title="어깨" onPress={() => setSelectedSubPart('shoulder')} />
-              <Button title="가슴" onPress={() => setSelectedSubPart('chest')} />
-            </View>
-            <Button title="뒤로" onPress={() => setSelectedPart(null)} />
-          </View>
-        );
-      }
-      if (selectedPart === 'lower') {
-        return (
-            <View style={styles.selectionContainer}>
-                <Text style={styles.selectionText}>2. 세부 부위를 선택하세요.</Text>
-                <View style={styles.buttonGroup}>
-                    <Button title="다리" onPress={() => setSelectedSubPart('leg')} />
-                </View>
-                <Button title="뒤로" onPress={() => setSelectedPart(null)} />
-            </View>
-        )
-      }
-    }
-
-    if (!selectedExercise) {
-      if (selectedSubPart === 'arm') {
-        return (
-          <View style={styles.selectionContainer}>
-            <Text style={styles.selectionText}>3. 운동을 선택하세요.</Text>
-            <View style={styles.buttonGroup}>
-              <Button title="이두 컬" onPress={() => setSelectedExercise('bicep_curl')} />
-              <Button title="삼두 익스텐션" onPress={() => setSelectedExercise('tricep_extension')} />
-            </View>
-            <Button title="뒤로" onPress={() => setSelectedSubPart(null)} />
-          </View>
-        );
-      }
-      if (selectedSubPart === 'leg') {
-        return (
-            <View style={styles.selectionContainer}>
-                <Text style={styles.selectionText}>3. 운동을 선택하세요.</Text>
-                <View style={styles.buttonGroup}>
-                    <Button title="스쿼트" onPress={() => setSelectedExercise('squat')} />
-                </View>
-                <Button title="뒤로" onPress={() => setSelectedSubPart(null)} />
-            </View>
-        )
-      }
-    }
-
-    return (
-      <View style={styles.selectionContainer}>
-        <Text style={styles.selectionText}>Ready to start: {selectedExercise}</Text>
-        <Button
-          title={`Start ${selectedExercise} Tracking`}
-          onPress={handleStartStop}
-          disabled={isLoading}
-        />
-        <Button title="운동 다시 선택" onPress={resetSelection} />
-      </View>
-    );
   };
 
-  if (hasPermission === null) return <Text>📷 카메라 권한 요청 중...</Text>;
-  if (hasPermission === false) return <Text>🚫 카메라 접근 권한이 없습니다.</Text>;
+  if (hasPermission === null) return <Text>카메라 권한 확인 중...</Text>;
+  if (hasPermission === false) return <Text>카메라 권한이 필요합니다.</Text>;
 
   return (
     <View style={styles.container}>
-      {isFocused && hasPermission && isCameraReady ? (
-        <CameraView
-          ref={cameraRef}
-          style={styles.camera}
-          facing="back"
-          onCameraReady={onCameraReady}
-        />
-      ) : (
-        <View style={styles.camera}><Text>카메라 준비 중...</Text></View>
-      )}
-
-      <View style={styles.controls}>
-        {renderSelectionControls()}
-
-        {isLoading && <ActivityIndicator size="small" color="#555" style={{ marginTop: 10 }} />}
-
-        {isRunning && score !== null && (
-          <Text style={[styles.result, { color: score >= 80 ? 'green' : 'red' }]}>
-            🏅 Score: {score}점
-          </Text>
-        )}
-
-        {isRunning && feedback && <Text style={styles.feedback}>💬 {feedback}</Text>}
-      </View>
+      <Camera ref={cameraRef} style={styles.camera} facing="front" ratio="16:9" />
+      {isLoading && <ActivityIndicator size="large" color="#007bff" style={styles.loading} />}
+      {renderSelectionControls()}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  camera: { flex: 4 },
-  controls: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f0f0f0',
-  },
-  selectionContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  selectionText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  buttonGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginBottom: 15,
-  },
-  result: {
-    marginTop: 12,
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  feedback: {
-    marginTop: 6,
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    paddingHorizontal: 10,
-  },
+  container: { flex: 1, backgroundColor: '#f0f0f0' },
+  camera: { flex: 3, width: '100%' },
+  loading: { position: 'absolute', top: '50%', left: '50%', marginLeft: -25, marginTop: -25 },
+  selectionContainer: { flex: 2, padding: 15 },
+  buttonGroup: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginVertical: 10 },
+  btn: { backgroundColor: '#007bff', paddingVertical: 12, paddingHorizontal: 18, borderRadius: 8, margin: 6 },
+  btnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  backBtn: { padding: 10, marginTop: 5, alignSelf: 'center' },
+  backBtnText: { color: '#007bff', fontWeight: 'bold', fontSize: 16 },
+  startBtn: { backgroundColor: 'green', padding: 15, borderRadius: 10, alignItems: 'center', marginVertical: 10 },
+  startBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  runningContainer: { flex: 2, alignItems: 'center', justifyContent: 'center', padding: 10 },
+  stopBtn: { backgroundColor: 'red', padding: 15, borderRadius: 10, marginVertical: 10 },
+  stopBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  score: { fontSize: 22, fontWeight: 'bold', marginVertical: 10 },
+  feedback: { fontSize: 18, textAlign: 'center', paddingHorizontal: 15 },
 });

@@ -7,7 +7,7 @@
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web",
+    
     "lint": "expo lint"
   },
   "dependencies": {
@@ -37,9 +37,9 @@
     "expo-status-bar": "~2.2.3",
     "expo-symbols": "~0.4.4",
     "expo-system-ui": "~5.0.7",
-    "expo-web-browser": "~14.2.0",
+    
     "react": "19.0.0",
-    "react-dom": "19.0.0",
+    
     "react-native": "0.79.5",
     "react-native-fs": "^2.20.0",
     "react-native-gesture-handler": "~2.24.0",
@@ -47,9 +47,9 @@
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-svg": "15.11.2",
-    "react-native-web": "~0.20.0",
+    
     "react-native-webview": "13.13.5",
-    "react-webcam": "^7.2.0",
+    
     "styled-components": "^6.1.18"
   },
   "devDependencies": {

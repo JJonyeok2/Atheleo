@@ -15,7 +15,7 @@ SECRET_KEY = 'django-insecure-br8@g033ij=4927w6vnrrj2+f74qxglqgka72w15ut893u*tld
 DEBUG = True
 
 # 외부 접근 허용 (개발용 IP 포함)
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '172.30.1.9']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '172.30.1.9', '172.30.1.13', '10.0.2.2']
 
 # Application definition
 INSTALLED_APPS = [
@@ -42,7 +42,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        # 'rest_framework.permissions.IsAuthenticated', # Temporarily commented out for testing
     ]
 }
 
@@ -118,7 +118,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ✅ CORS 설정
-CORS_ALLOW_ALL_ORIGINS = True # 개발 초기엔 True로 설정하여 모든 요청을 허용할 수 있음
+CORS_ALLOW_ALL_ORIGINS = False # 개발 초기엔 True로 설정하여 모든 요청을 허용할 수 있음
 
 # 특정 출처만 허용하도록 설정 (보안상 권장)
 CORS_ALLOWED_ORIGINS = [
@@ -128,12 +128,15 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8081",
     "http://127.0.0.1:8082", # Expo Web (current)
     "http://127.0.0.1:19006",
-    f"http://{os.environ.get('IP_ADDRESS')}:8081", # 동적 IP 지원
-    f"http://{os.environ.get('IP_ADDRESS')}:19006",
+    "http://172.30.1.13:8081",
 ]
 
-# 환경 변수에서 IP 주소를 가져오지 못할 경우를 대비한 기본값 설정
-if 'IP_ADDRESS' not in os.environ:
+# 환경 변수에서 IP 주소를 가져와 동적으로 추가
+ip_address = os.environ.get('IP_ADDRESS')
+if ip_address:
+    CORS_ALLOWED_ORIGINS.extend([
+        f"http://{ip_address}:8081",
+        f"http://{ip_address}:19006",
+    ])
+else:
     print("Warning: IP_ADDRESS environment variable not set. CORS might not work with dynamic IP.")
-    # 필요한 경우 기본 IP를 추가할 수 있습니다.
-    # CORS_ALLOWED_ORIGINS.append("http://172.30.1.9:8081")

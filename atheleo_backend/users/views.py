@@ -24,7 +24,7 @@ class LoginView(ObtainAuthToken):
 
         return Response({
             'token': token.key,
-            'user': user_serializer.data
+            **user_serializer.data
         })
 
 class ProfileView(generics.RetrieveUpdateAPIView):

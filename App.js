@@ -18,8 +18,15 @@ import Subscribe from './app/screens/Subscribe';
 const Stack = createNativeStackNavigator();
 
 function HeaderTitle({ navigation }) {
+    const handlePress = () => {
+        // 현재 화면이 Home이 아닐 경우에만 popToTop을 실행합니다.
+        if (navigation.canGoBack()) {
+            navigation.popToTop();
+        }
+    };
+
     return (
-        <TouchableOpacity onPress={() => navigation.popToTop()}>
+        <TouchableOpacity onPress={handlePress}>
             <Text style={styles.headerTitle}>Atheleo</Text>
         </TouchableOpacity>
     );
@@ -36,9 +43,14 @@ function HeaderRightButtons({ navigation }) {
     return (
         <View style={styles.headerButtonsContainer}>
             {isLoggedIn ? (
-                <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Profile')}>
-                    <Feather name="user" size={24} color="#007bff" />
-                </TouchableOpacity>
+                <>
+                    <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Profile')}>
+                        <Feather name="user" size={24} color="#007bff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.iconButton} onPress={handleLogout}>
+                        <Feather name="log-out" size={24} color="#007bff" />
+                    </TouchableOpacity>
+                </>
             ) : (
                 <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Login')}>
                     <Text style={styles.buttonText}>로그인</Text>

@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }) => {
         if (storedToken) {
           // 토큰이 있으면 사용자 정보도 다시 불러오거나, 토큰만 저장
           // 여기서는 간단히 토큰만 user 객체에 넣어줌 (실제 앱에서는 사용자 정보도 API로 불러오는 것이 좋음)
-          setUser({ token: storedToken, isLoggedIn: true }); 
+          setUser({ token: storedToken }); 
         }
       } catch (e) {
         console.error('Failed to load user token from AsyncStorage', e);
@@ -27,7 +27,8 @@ export const AuthProvider = ({ children }) => {
     loadStoredUser();
   }, []);
 
-  const login = (userData) => {
+  const login = async (userData) => {
+    await AsyncStorage.setItem('userToken', userData.token);
     console.log('AuthContext - login userData:', userData); // 디버깅용
     setUser(userData);
   };

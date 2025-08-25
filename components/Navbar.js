@@ -20,7 +20,7 @@ const Navbar = () => {
 
       <View style={styles.menu}>
         {isLoggedIn ? (
-          <> {/* 로그인 상태일 때 */}
+          <>
             <TouchableOpacity onPress={() => navigation.navigate('ExerciseWithAI')}>
               <Text style={styles.menuItem}>운동</Text>
             </TouchableOpacity>
@@ -30,7 +30,7 @@ const Navbar = () => {
             <TouchableOpacity onPress={() => navigation.navigate('Subscribe')}>
               <Text style={styles.menuItem}>구독</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('Profile')}> {/* 마이페이지 */}
+            <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
               <Text style={styles.menuItem}>마이페이지</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleLogout}>
@@ -38,13 +38,11 @@ const Navbar = () => {
             </TouchableOpacity>
           </>
         ) : (
-          <> {/* 로그아웃 상태일 때 */}
+          <>
             <TouchableOpacity onPress={() => navigation.navigate('Login')}>
               <Text style={styles.menuItem}>로그인</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-              <Text style={styles.menuItem}>회원가입</Text>
-            </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('Subscribe')}>
               <Text style={styles.menuItem}>구독하기</Text>
             </TouchableOpacity>

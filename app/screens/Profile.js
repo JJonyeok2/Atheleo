@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Platform } from 'react-native';
+import { ActivityIndicator, Alert, Platform, View, Text } from 'react-native';
 import styled from 'styled-components/native';
 import { useAuth } from './Authcontext';
 import { Feather } from '@expo/vector-icons';
@@ -121,7 +121,7 @@ const Profile = () => {
       }
 
       try {
-        const res = await axios.get('http://127.0.0.1:8000/api/users/profile/', {
+        const res = await axios.get('http://172.30.1.13:8000/api/users/profile/', {
           headers: { Authorization: `Token ${user.token}` },
         });
         setProfile(res.data);
@@ -184,7 +184,7 @@ const Profile = () => {
 
     try {
       // PUT 대신 PATCH 사용
-      const res = await axios.patch('http://127.0.0.1:8000/api/users/profile/', formData, {
+      const res = await axios.patch('http://172.30.1.13:8000/api/users/profile/', formData, {
         headers: {
           Authorization: `Token ${user.token}`,
           'Content-Type': 'multipart/form-data',
@@ -206,60 +206,54 @@ const Profile = () => {
 
   return (
     <Container>
+      <Title>My Profile</Title>
       <ProfileContainer>
         <ProfileImageContainer>
-          <ProfileImage source={imageUri ? { uri: imageUri } : require('../../assets/images/icon.png')} />
+          <ProfileImage source={{ uri: imageUri }} />
           <UploadButton onPress={handleChoosePhoto}>
             <Feather name="camera" size={20} color="white" />
           </UploadButton>
         </ProfileImageContainer>
-
         <InfoContainer>
-          <Title>My Profile</Title>
           <Form>
             <InputContainer>
-              <Feather name="user" size={20} color="#aaa" />
+              <Feather name="mail" size={20} color="#888" />
               <Input
-                placeholder="Username"
-                placeholderTextColor="#aaa"
-                value={profile.username || ''}
-                editable={false}
-              />
-            </InputContainer>
-            <InputContainer>
-              <Feather name="mail" size={20} color="#aaa" />
-              <Input
+                value={profile.email}
+                onChangeText={(val) => handleChange('email', val)}
                 placeholder="Email"
-                placeholderTextColor="#aaa"
-                value={profile.email || ''}
-                onChangeText={(text) => handleChange('email', text)}
+                keyboardType="email-address"
+                autoCapitalize="none"
               />
             </InputContainer>
             <InputContainer>
-              <Feather name="user" size={20} color="#aaa" />
+              <Feather name="user" size={20} color="#888" />
               <Input
+                value={profile.name}
+                onChangeText={(val) => handleChange('name', val)}
                 placeholder="Name"
-                placeholderTextColor="#aaa"
-                value={profile.name || ''}
-                onChangeText={(text) => handleChange('name', text)}
               />
             </InputContainer>
             <InputContainer>
-              <Feather name="phone" size={20} color="#aaa" />
+              <Feather name="phone" size={20} color="#888" />
               <Input
+                value={profile.phone}
+                onChangeText={(val) => handleChange('phone', val)}
                 placeholder="Phone"
-                placeholderTextColor="#aaa"
-                value={profile.phone || ''}
-                onChangeText={(text) => handleChange('phone', text)}
+                keyboardType="phone-pad"
               />
             </InputContainer>
-            <SubscriptionText>Subscription: {profile.subscription_type || 'FREE'}</SubscriptionText>
             <Button onPress={handleSubmit}>
-              <ButtonText>Save Profile</ButtonText>
+              <ButtonText>Update Profile</ButtonText>
             </Button>
           </Form>
         </InfoContainer>
       </ProfileContainer>
+      {profile.subscription_type && (
+        <SubscriptionText>
+          Subscription: {profile.subscription_type}
+        </SubscriptionText>
+      )}
     </Container>
   );
 };

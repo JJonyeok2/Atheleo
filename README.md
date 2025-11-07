@@ -252,9 +252,11 @@ const frameProcessor = useFrameProcessor((frame) => {
 
 이 프로젝트는 비공개 프로젝트입니다.
 
-## 👥 기여자
+## 👥 팀 구성
 
-- 개발팀
+- 개발팀장 : 전종혁
+- 개발팀원 : 김한수
+
 
 ## 📞 문의
 

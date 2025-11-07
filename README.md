@@ -2,8 +2,7 @@
 # Atheleo - AI 기반 피트니스 앱
 
 Atheleo는 실시간 AI 운동 자세 분석과 체형 분석 기능을 제공하는 React Native 기반 모바일 애플리케이션입니다.
-
-## 현재 final-main은 ios 환경을 중점으로 개발했습니다.
+현재 final-main은 ios 환경을 중점으로 개발했습니다.
 
 ## 📱 주요 기능
 

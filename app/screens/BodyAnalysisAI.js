@@ -177,15 +177,20 @@ export default function BodyAnalysisAI() {
         </View>
 
         <View style={styles.buttonRow}>
-          <TouchableOpacity style={styles.actionButton} activeOpacity={0.88} onPress={pickImage}>
-            <Text style={styles.actionButtonText}>앨범에서 선택</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} activeOpacity={0.88} onPress={takePicture}>
-            <Text style={styles.actionButtonText}>카메라 촬영</Text>
-          </TouchableOpacity>
+          <View style={styles.actionShadow}>
+            <TouchableOpacity style={styles.actionButton} activeOpacity={0.88} onPress={pickImage}>
+              <Text style={styles.actionButtonText}>앨범에서 선택</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.actionShadow}>
+            <TouchableOpacity style={styles.actionButton} activeOpacity={0.88} onPress={takePicture}>
+              <Text style={styles.actionButtonText}>카메라 촬영</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={styles.previewCard}>
+        <View style={styles.previewShadow}>
+          <View style={styles.previewCard}>
           {imageUri ? (
             <>
               {analysis && analysis.landmarks && Array.isArray(analysis.landmarks) && imageLayout ? (
@@ -213,35 +218,42 @@ export default function BodyAnalysisAI() {
               </Text>
             </View>
           )}
+          </View>
         </View>
 
         {isLoading && (
-          <View style={styles.loaderCard}>
-            <ActivityIndicator size="large" color="#7ab8ff" />
-            <Text style={styles.loaderText}>AI가 체형을 분석 중입니다...</Text>
+          <View style={styles.loaderShadow}>
+            <View style={styles.loaderCard}>
+              <ActivityIndicator size="large" color="#7ab8ff" />
+              <Text style={styles.loaderText}>AI가 체형을 분석 중입니다...</Text>
+            </View>
           </View>
         )}
 
         {error && !isLoading && (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorTitle}>분석에 실패했어요</Text>
-            <Text style={styles.errorMessage}>{error}</Text>
+          <View style={styles.errorShadow}>
+            <View style={styles.errorCard}>
+              <Text style={styles.errorTitle}>분석에 실패했어요</Text>
+              <Text style={styles.errorMessage}>{error}</Text>
+            </View>
           </View>
         )}
 
         {analysis && !isLoading && (
-          <View style={styles.resultCard}>
-            <Text style={styles.resultBadge}>RESULT</Text>
-            <Text style={styles.resultTitle}>당신의 체형은</Text>
-            <Text style={styles.resultShape}>{analysis.body_shape}</Text>
+          <View style={styles.resultShadow}>
+            <View style={styles.resultCard}>
+              <Text style={styles.resultBadge}>RESULT</Text>
+              <Text style={styles.resultTitle}>당신의 체형은</Text>
+              <Text style={styles.resultShape}>{analysis.body_shape}</Text>
 
-            {renderMetrics()}
+              {renderMetrics()}
 
-            {analysis.description && (
-              <View style={styles.descriptionBox}>
-                <Text style={styles.descriptionText}>{analysis.description}</Text>
-              </View>
-            )}
+              {analysis.description && (
+                <View style={styles.descriptionBox}>
+                  <Text style={styles.descriptionText}>{analysis.description}</Text>
+                </View>
+              )}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -285,21 +297,26 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 24,
   },
-  actionButton: {
+  actionShadow: {
     flex: 1,
     minWidth: 140,
+    borderRadius: 20,
+    backgroundColor: '#0b142b',
+    shadowColor: '#0A84FF',
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+  actionButton: {
+    flex: 1,
     paddingVertical: 14,
     borderRadius: 18,
-    backgroundColor: 'rgba(17, 42, 92, 0.6)',
+    backgroundColor: 'rgba(17, 42, 92, 0.65)',
     borderWidth: 1,
     borderColor: 'rgba(115, 189, 255, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0A84FF',
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
   },
   actionButtonText: {
     color: '#E9F2FF',
@@ -307,8 +324,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.6,
   },
-  previewCard: {
+  previewShadow: {
     marginHorizontal: 24,
+    borderRadius: 28,
+    backgroundColor: '#0a132a',
+    shadowColor: '#0A1F4D',
+    shadowOpacity: 0.35,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 10,
+  },
+  previewCard: {
     borderRadius: 26,
     overflow: 'hidden',
     borderWidth: 1,
@@ -317,11 +343,6 @@ const styles = StyleSheet.create({
     minHeight: 360,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0A1F4D',
-    shadowOpacity: 0.35,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 8,
     padding: 12,
   },
   preview: {
@@ -345,19 +366,23 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
   },
-  loaderCard: {
+  loaderShadow: {
     marginTop: 28,
     marginHorizontal: 24,
+    borderRadius: 24,
+    backgroundColor: '#0b172f',
+    shadowColor: '#102A5C',
+    shadowOpacity: 0.28,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+  },
+  loaderCard: {
     borderRadius: 22,
     paddingVertical: 32,
     alignItems: 'center',
     backgroundColor: 'rgba(12, 25, 52, 0.6)',
     borderWidth: 1,
     borderColor: 'rgba(132, 178, 255, 0.25)',
-    shadowColor: '#102A5C',
-    shadowOpacity: 0.28,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 12 },
   },
   loaderText: {
     marginTop: 16,
@@ -365,9 +390,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     letterSpacing: 0.3,
   },
-  errorCard: {
+  errorShadow: {
     marginTop: 24,
     marginHorizontal: 24,
+    borderRadius: 22,
+    backgroundColor: '#2a1015',
+    shadowColor: '#60151f',
+    shadowOpacity: 0.3,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  errorCard: {
     borderRadius: 20,
     padding: 20,
     backgroundColor: 'rgba(255, 74, 88, 0.12)',
@@ -385,9 +418,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
   },
-  resultCard: {
+  resultShadow: {
     marginTop: 28,
     marginHorizontal: 24,
+    borderRadius: 28,
+    backgroundColor: '#0a162f',
+    shadowColor: '#0A2048',
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 16 },
+  },
+  resultCard: {
     borderRadius: 26,
     paddingVertical: 28,
     paddingHorizontal: 20,
@@ -395,10 +436,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 26, 54, 0.62)',
     borderWidth: 1,
     borderColor: 'rgba(110, 184, 255, 0.35)',
-    shadowColor: '#0A2048',
-    shadowOpacity: 0.28,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 16 },
   },
   resultBadge: {
     fontSize: 13,

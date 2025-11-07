@@ -1,6 +1,6 @@
 // app/screens/HomeScreen.js
 import { useNavigation } from '@react-navigation/native';
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   View,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { useAuth } from './Authcontext';
 
@@ -56,6 +57,7 @@ export default function HomeScreen() {
   const { height } = useWindowDimensions();
   const scrollRef = useRef(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const onScroll = (e) => {
     const y = e.nativeEvent.contentOffset.y;
@@ -63,6 +65,16 @@ export default function HomeScreen() {
   };
 
   const scrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
+
+  const onRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      // TODO: 홈 화면 데이터 재로딩 로직이 생기면 이 위치에서 처리합니다.
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -76,6 +88,14 @@ export default function HomeScreen() {
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#8AB8FF"
+            progressBackgroundColor="rgba(5, 11, 24, 0.85)"
+          />
+        }
       >
         {SECTIONS_DATA.map((item, index) => (
           <Section
@@ -132,9 +152,11 @@ function Section({ item, index, totalCount }) {
   const isHero = item.key === 'hero';
   const isLast = index === totalCount - 1;
 
-  const minH = isHero || isLast
+  const minH = isHero
     ? Math.max(height * 0.9, 560)
-    : Math.max(height * 0.48, 360);
+    : isLast
+    ? Math.max(height * 0.85, 520)
+    : Math.max(height * 0.7, 460);
 
   return (
     <View style={[styles.section, { minHeight: minH }]}>
@@ -161,29 +183,35 @@ function Section({ item, index, totalCount }) {
 
           {isHero && (
             <View style={styles.actionsWrap}>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Subscribe')}
-                style={[styles.glassBtn, styles.btnPrimary]}
-                activeOpacity={0.9}
-              >
-                <Text style={styles.btnTxt}>AI 구독하기</Text>
-              </TouchableOpacity>
+              <View style={styles.btnShadow}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Subscribe')}
+                  style={[styles.glassBtn, styles.btnPrimary]}
+                  activeOpacity={0.9}
+                >
+                  <Text style={styles.btnTxt}>AI 구독하기</Text>
+                </TouchableOpacity>
+              </View>
 
-              <TouchableOpacity
-                onPress={() => navigation.navigate('BodyAnalysisAI')}
-                style={[styles.glassBtn, styles.btnSuccess]}
-                activeOpacity={0.9}
-              >
-                <Text style={styles.btnTxt}>체형 분석 시작하기</Text>
-              </TouchableOpacity>
+              <View style={styles.btnShadow}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('BodyAnalysisAI')}
+                  style={[styles.glassBtn, styles.btnSuccess]}
+                  activeOpacity={0.9}
+                >
+                  <Text style={styles.btnTxt}>체형 분석 시작하기</Text>
+                </TouchableOpacity>
+              </View>
 
-              <TouchableOpacity
-                onPress={handleAIExercisePress}
-                style={[styles.glassBtn, styles.btnWarn]}
-                activeOpacity={0.9}
-              >
-                <Text style={styles.btnTxt}>AI 운동하기</Text>
-              </TouchableOpacity>
+              <View style={styles.btnShadow}>
+                <TouchableOpacity
+                  onPress={handleAIExercisePress}
+                  style={[styles.glassBtn, styles.btnWarn]}
+                  activeOpacity={0.9}
+                >
+                  <Text style={styles.btnTxt}>AI 운동하기</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -221,14 +249,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5, 7, 15, 0.35)',
   },
   sectionOverlayHero: {
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 130,
+    paddingHorizontal: 28,
+    paddingTop: 44,
+    paddingBottom: 140,
   },
   sectionOverlayMid: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 80,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 110,
   },
   contentBox: {
     width: '100%',
@@ -266,22 +294,26 @@ const styles = StyleSheet.create({
     marginTop: 28,
     width: '100%',
     alignSelf: 'center',
-    gap: 14,
+    gap: 16,
+  },
+  btnShadow: {
+    borderRadius: 22,
+    backgroundColor: '#0d162b',
+    shadowColor: '#0A84FF',
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
   },
   glassBtn: {
     width: '100%',
     paddingVertical: 16,
     borderRadius: 20,
-    backgroundColor: 'rgba(12, 22, 42, 0.55)',
+    backgroundColor: 'rgba(20, 38, 72, 0.6)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#111C2C',
-    shadowOpacity: 0.3,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 6,
   },
   btnPrimary: {
     borderColor: 'rgba(58,130,255,0.45)',
@@ -312,7 +344,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 18,
     borderRadius: 18,
-    backgroundColor: 'rgba(15, 24, 44, 0.6)',
+    backgroundColor: '#132041',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
     shadowColor: '#0A84FF',

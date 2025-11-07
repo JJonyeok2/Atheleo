@@ -27,8 +27,10 @@ const SECTIONS_DATA = [
     subHeader: '연혁',
     texts: [
       'Atheleo 팀 2025년 3월 10일 구성',
-      '2025년 3월 17일 | 전체 홈페이지 기획',
-      '2025년 3월 24일 | 1차 발표',
+      '2025년 3월 17일 |  기획',
+      '2025년 3월 24일 | 첫 발표',
+      '2025년 11월 5일 | 백엔드 로직 구현',
+      '2025년 11월 6일 | 카메라 기능 구현',
     ],
     image: require('../../assets/45615.jpg'),
   },
@@ -42,9 +44,9 @@ const SECTIONS_DATA = [
     key: 'ai',
     subHeader: 'Atheleo AI',
     texts: [
-      '체형 분석 + 운동 추천 시스템',
+      '체형 분석 + 각 체형별 운동 추천 시스템',
       '유사 체형 루틴 제공',
-      '부위별 데이터 조정 + 자세 교정 피드백',
+      '부위별 데이터 조정 + 운동 자세 교정 피드백',
     ],
     image: require('../../assets/45617.jpg'),
   },
@@ -69,12 +71,19 @@ export default function HomeScreen() {
         ref={scrollRef}
         style={styles.container}
         contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="always"
+        contentInset={{ bottom: 120 }}
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
       >
-        {SECTIONS_DATA.map((item) => (
-          <Section key={item.key} item={item} />
+        {SECTIONS_DATA.map((item, index) => (
+          <Section
+            key={item.key}
+            item={item}
+            index={index}
+            totalCount={SECTIONS_DATA.length}
+          />
         ))}
       </ScrollView>
 
@@ -87,7 +96,7 @@ export default function HomeScreen() {
   );
 }
 
-function Section({ item }) {
+function Section({ item, index, totalCount }) {
   const navigation = useNavigation();
   const { user } = useAuth();
   const { height } = useWindowDimensions();
@@ -121,139 +130,201 @@ function Section({ item }) {
   };
 
   const isHero = item.key === 'hero';
-  // 화면 크기에 따라 유연하게: 히어로는 좀 더 큼
-  const minH = isHero ? Math.max(height * 0.9, 560) : Math.max(height * 0.6, 420);
+  const isLast = index === totalCount - 1;
+
+  const minH = isHero || isLast
+    ? Math.max(height * 0.9, 560)
+    : Math.max(height * 0.48, 360);
 
   return (
     <View style={[styles.section, { minHeight: minH }]}>
-      <Image source={item.image} style={styles.bg} resizeMode="cover" />
-      <View style={styles.overlay}>
-        {item.header && <Text style={styles.header}>{item.header}</Text>}
-        {item.subHeader && <Text style={styles.subHeader}>{item.subHeader}</Text>}
+      <Image
+        source={item.image}
+        style={styles.bg}
+        resizeMode="cover"
+      />
+      <View
+        style={[
+          styles.sectionOverlay,
+          isHero || isLast ? styles.sectionOverlayHero : styles.sectionOverlayMid,
+        ]}
+      >
+        <View style={styles.contentBox}>
+          {item.header && <Text style={styles.header}>{item.header}</Text>}
+          {item.subHeader && <Text style={styles.subHeader}>{item.subHeader}</Text>}
 
-        {item.texts?.map((t, i) => (
-          <Text key={i} style={styles.body}>
-            {t}
-          </Text>
-        ))}
+          {item.texts?.map((t, i) => (
+            <Text key={i} style={styles.body}>
+              {t}
+            </Text>
+          ))}
 
-        {isHero && (
-          <View style={styles.actionsWrap}>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Subscribe')}
-              style={[styles.btn, styles.btnPrimary]}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.btnTxt}>AI 구독하기</Text>
-            </TouchableOpacity>
+          {isHero && (
+            <View style={styles.actionsWrap}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Subscribe')}
+                style={[styles.glassBtn, styles.btnPrimary]}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.btnTxt}>AI 구독하기</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => navigation.navigate('BodyAnalysisAI')}
-              style={[styles.btn, styles.btnSuccess, styles.btnGap]}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.btnTxt}>체형 분석 시작하기</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('BodyAnalysisAI')}
+                style={[styles.glassBtn, styles.btnSuccess]}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.btnTxt}>체형 분석 시작하기</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={handleAIExercisePress}
-              style={[styles.btn, styles.btnWarn, styles.btnGap]}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.btnTxt}>AI 운동하기</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+              <TouchableOpacity
+                onPress={handleAIExercisePress}
+                style={[styles.glassBtn, styles.btnWarn]}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.btnTxt}>AI 운동하기</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#000' },
-  container: { flex: 1, backgroundColor: '#000' },
-  content: { paddingBottom: 48 },
+  safe: {
+    flex: 1,
+    backgroundColor: '#05070f',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#05070f',
+  },
+  content: {
+    paddingBottom: 160,
+  },
 
   section: {
     position: 'relative',
     width: '100%',
-    backgroundColor: '#0a0a0a',
-    // overflow: 'hidden', // ❌ 잘림 방지: 제거
-  },
-  bg: { position: 'absolute', width: '100%', height: '100%' },
-
-  // 중앙정렬 보장용: flex:1 + 패딩 + 반투명 배경
-  overlay: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 28,
-    paddingBottom: 40, // 버튼 3개가 항상 보이도록 여유
-    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'stretch',
   },
-
+  bg: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sectionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(5, 7, 15, 0.35)',
+  },
+  sectionOverlayHero: {
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 130,
+  },
+  sectionOverlayMid: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 80,
+  },
+  contentBox: {
+    width: '100%',
+    maxWidth: 720,
+    alignItems: 'center',
+  },
   header: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '800',
-    color: '#fff',
+    color: '#F8FBFF',
     textAlign: 'center',
-    marginBottom: 10,
-    alignSelf: 'center',
+    marginBottom: 12,
+    letterSpacing: 0.8,
+    textShadowColor: 'rgba(10,132,255,0.35)',
+    textShadowRadius: 16,
+    textShadowOffset: { width: 0, height: 2 },
   },
   subHeader: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#fff',
+    color: '#D7E3FF',
     textAlign: 'center',
-    marginBottom: 8,
-    alignSelf: 'center',
+    marginBottom: 10,
+    letterSpacing: 0.5,
   },
   body: {
     fontSize: 16,
-    color: '#fff',
+    color: '#E5EDFF',
     textAlign: 'center',
-    marginVertical: 4,
-    opacity: 0.95,
-    alignSelf: 'center',
+    marginVertical: 6,
+    opacity: 0.92,
+    lineHeight: 24,
   },
-
-  // 버튼 스택
   actionsWrap: {
-    marginTop: 18,
+    marginTop: 28,
     width: '100%',
-    maxWidth: 560,
     alignSelf: 'center',
-    alignItems: 'stretch',
+    gap: 14,
   },
-  btn: {
+  glassBtn: {
     width: '100%',
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 16,
+    paddingVertical: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(12, 22, 42, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#111C2C',
+    shadowOpacity: 0.3,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
   },
-  btnGap: { marginTop: 12 },
-  btnPrimary: { backgroundColor: '#0A84FF' },
-  btnSuccess: { backgroundColor: '#28A745' },
-  btnWarn: { backgroundColor: '#FFC107' },
+  btnPrimary: {
+    borderColor: 'rgba(58,130,255,0.45)',
+    backgroundColor: 'rgba(10,132,255,0.18)',
+    shadowColor: '#1A6BFF',
+  },
+  btnSuccess: {
+    borderColor: 'rgba(86, 204, 242, 0.45)',
+    backgroundColor: 'rgba(61, 220, 151, 0.16)',
+    shadowColor: '#3DDC97',
+  },
+  btnWarn: {
+    borderColor: 'rgba(255, 186, 73, 0.45)',
+    backgroundColor: 'rgba(255, 186, 73, 0.16)',
+    shadowColor: '#FFB648',
+  },
   btnTxt: {
-    color: '#fff',
-    fontSize: 17,
+    color: '#F5FBFF',
+    fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
+    letterSpacing: 0.6,
   },
-
   scrollTopBtn: {
     position: 'absolute',
-    right: 16,
-    bottom: 24,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+    right: 18,
+    bottom: 30,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    backgroundColor: 'rgba(15, 24, 44, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    shadowColor: '#0A84FF',
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
-  scrollTopTxt: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  scrollTopTxt: {
+    color: '#F2F6FF',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
 });

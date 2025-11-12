@@ -11,7 +11,10 @@ import {
   Text,
   TouchableOpacity,
   View,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Worklets } from 'react-native-worklets-core';
 import {
   Camera,
@@ -26,7 +29,40 @@ import { useAuth } from './Authcontext';
 import Tts from 'react-native-tts';
 
 export default function ExerciseWithAI() {
+  const navigation = useNavigation();
   const { user } = useAuth();
+  const [hasAccess, setHasAccess] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setHasAccess(false);
+      Alert.alert(
+        '로그인이 필요합니다',
+        'AI 운동 기능을 이용하려면 로그인해 주세요.',
+        [
+          { text: '로그인하기', onPress: () => navigation.replace('Login') },
+          { text: '돌아가기', style: 'cancel', onPress: () => navigation.goBack() },
+        ],
+      );
+      return;
+    }
+
+    const tier = (user.subscription_type || '').toUpperCase();
+    if (tier !== 'STANDARD' && tier !== 'PRO') {
+      setHasAccess(false);
+      Alert.alert(
+        '구독이 필요합니다',
+        'Standard 이상 구독 회원만 AI 운동 기능을 사용할 수 있어요.',
+        [
+          { text: '구독 화면으로 이동', onPress: () => navigation.replace('Subscribe') },
+          { text: '돌아가기', style: 'cancel', onPress: () => navigation.goBack() },
+        ],
+      );
+      return;
+    }
+
+    setHasAccess(true);
+  }, [navigation, user]);
 
   // ─────────────────────────────────────────────────────────────
   // Camera device & format
@@ -215,7 +251,13 @@ export default function ExerciseWithAI() {
       setHasPermission(false);
     }
   }, []);
-  useEffect(() => { requestPermissions(); }, [requestPermissions]);
+  useEffect(() => {
+    if (!hasAccess) {
+      setHasPermission(null);
+      return;
+    }
+    requestPermissions();
+  }, [hasAccess, requestPermissions]);
 
   // ─────────────────────────────────────────────────────────────
   // AppState
@@ -534,6 +576,17 @@ export default function ExerciseWithAI() {
   // ─────────────────────────────────────────────────────────────
   // Rendering guards
   // ─────────────────────────────────────────────────────────────
+  if (!hasAccess) {
+    return (
+      <View style={[styles.centered, { paddingHorizontal: 24 }]}>
+        <Text style={styles.permissionText}>AI 운동 기능은 로그인 및 Standard 이상 구독 후 이용할 수 있어요.</Text>
+        <Text style={[styles.permissionText, { fontSize: 14, fontWeight: 'normal' }]}>
+          상단 메뉴에서 로그인 또는 구독을 완료한 뒤 다시 시도해 주세요.
+        </Text>
+      </View>
+    );
+  }
+
   if (!device || hasPermission === null) {
     return (
       <View style={styles.centered}>
@@ -561,194 +614,201 @@ export default function ExerciseWithAI() {
   // UI
   // ─────────────────────────────────────────────────────────────
   return (
-    <View style={styles.container}>
-      {/* Camera */}
-      {device && hasPermission === true && (
-        <Camera
-          style={StyleSheet.absoluteFill}
-          device={device}
-          isActive={isForeground && cameraActive}
-          format={format}
-          frameProcessor={frameProcessor}
-          frameProcessorFps={2}
-          pixelFormat="yuv"
-          onInitialized={() => {
-            console.log('[Camera] ✅ Initialized');
-            setCameraActive(true);
-          }}
-          onError={(error) => {
-            console.error('[Camera] ❌ Error:', error?.message);
-            setCameraActive(false);
-            Alert.alert('카메라 오류', error?.message ?? '알 수 없는 오류');
-          }}
-        />
-      )}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" />
+      <View style={styles.container}>
+        {/* Camera */}
+        {device && hasPermission === true && (
+          <Camera
+            style={StyleSheet.absoluteFill}
+            device={device}
+            isActive={isForeground && cameraActive}
+            format={format}
+            frameProcessor={frameProcessor}
+            frameProcessorFps={2}
+            pixelFormat="yuv"
+            onInitialized={() => {
+              console.log('[Camera] ✅ Initialized');
+              setCameraActive(true);
+            }}
+            onError={(error) => {
+              console.error('[Camera] ❌ Error:', error?.message);
+              setCameraActive(false);
+              Alert.alert('카메라 오류', error?.message ?? '알 수 없는 오류');
+            }}
+          />
+        )}
 
-      {/* 📏 Guideline Overlay - 운동 선택했지만 시작 전 */}
-      {selectedExercise && !isRunning && cameraActive && (
-        <View style={styles.guidelineContainer}>
-          {/* 가이드라인 테두리 */}
-          <View style={[
-            styles.guideFrame,
-            selectedExercise === 'squat' ? styles.guideFrameFullBody : styles.guideFrameUpperBody
-          ]}>
-            {/* 코너 마크 (4개 모서리) */}
-            <View style={[styles.corner, styles.cornerTopLeft]} />
-            <View style={[styles.corner, styles.cornerTopRight]} />
-            <View style={[styles.corner, styles.cornerBottomLeft]} />
-            <View style={[styles.corner, styles.cornerBottomRight]} />
-          </View>
-          
-          {/* 안내 텍스트 */}
-          <View style={styles.guideTextContainer}>
-            <Text style={styles.guideText}>
-              {selectedExercise === 'squat' ? '🧍 전신이 보이도록 서주세요' : '💪 상체가 보이도록 위치하세요'}
-            </Text>
-            <Text style={styles.guideSubText}>
-              {exerciseNameMap[selectedExercise]} 준비
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* ⚡ 섬광 효과 (Flash Feedback) */}
-      {flashColor && (
-        <View 
-          style={[
-            styles.flashOverlay,
-            flashColor === 'green' && styles.flashGreen,
-            flashColor === 'yellow' && styles.flashYellow,
-            flashColor === 'red' && styles.flashRed,
-          ]} 
-        />
-      )}
-
-      {/* Debug HUD */}
-      <View style={styles.debugHud}>
-        <Text style={styles.debugLine}>
-          카메라:{' '}
-          <Text style={{ color: isForeground && cameraActive ? '#4CAF50' : '#F44336' }}>
-            {isForeground && cameraActive ? '활성' : '비활성'}
-          </Text>
-          {format && ` | ${format.videoWidth}x${format.videoHeight}@${format.maxFps}fps`}
-          {` | FP: ${fpTicks}`}
-        </Text>
-
-        <Text style={styles.debugLine}>
-          플러그인:{' '}
-          <Text style={{ color: pluginOk ? '#4CAF50' : '#F44336' }}>
-            {pluginOk ? 'OK' : 'MISSING'}
-          </Text>
-        </Text>
-
-        <Text style={styles.debugLine}>
-          백엔드:{' '}
-          <Text style={{ color: backendOk == null ? '#FFD54F' : backendOk ? '#4CAF50' : '#F44336' }}>
-            {backendOk == null ? '대기' : backendOk ? 'OK' : '오류'}
-          </Text>
-          {lastLatency != null && ` | ${lastLatency}ms`}
-          {lastResultAt && ` | ${lastResultAt}`}
-        </Text>
-
-        <Text style={styles.debugLine}>
-          인식:{' '}
-          <Text style={{ color: personDetected == null ? '#FFD54F' : personDetected ? '#4CAF50' : '#F44336' }}>
-            {personDetected == null ? '대기' : personDetected ? '인식중' : '사람없음'}
-          </Text>
-          {lastPose && ` | ${lastPose}`}
-        </Text>
-      </View>
-
-      {/* Controls */}
-      <View style={styles.controls}>
-        {/* 운동 선택 버튼들 - 운동 시작 전에만 표시 */}
-        {!isRunning && (
-          <View style={styles.selectionRow}>
-            {Object.entries(exerciseNameMap).map(([key, name], idx) => (
-              <TouchableOpacity
-                key={key}
-                style={[
-                  styles.exerciseTile,
-                  { width: tileSize, height: tileSize },
-                  selectedExercise === key && styles.exerciseTileSelected,
-                  idx === 0 ? { marginRight: 12 } : { marginLeft: 12 },
-                ]}
-                onPress={() => setSelectedExercise(key)}
-                activeOpacity={0.9}
-              >
-                <Text
-                  style={[
-                    styles.exerciseTileText,
-                    selectedExercise === key && styles.exerciseTileTextSelected,
-                  ]}
-                >
-                  {name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        {/* 📏 Guideline Overlay - 운동 선택했지만 시작 전 */}
+        {selectedExercise && !isRunning && cameraActive && (
+          <View style={styles.guidelineContainer}>
+            {/* 가이드라인 테두리 */}
+            <View style={[
+              styles.guideFrame,
+              selectedExercise === 'squat' ? styles.guideFrameFullBody : styles.guideFrameUpperBody
+            ]}>
+              {/* 코너 마크 (4개 모서리) */}
+              <View style={[styles.corner, styles.cornerTopLeft]} />
+              <View style={[styles.corner, styles.cornerTopRight]} />
+              <View style={[styles.corner, styles.cornerBottomLeft]} />
+              <View style={[styles.corner, styles.cornerBottomRight]} />
+            </View>
+            
+            {/* 안내 텍스트 */}
+            <View style={styles.guideTextContainer}>
+              <Text style={styles.guideText}>
+                {selectedExercise === 'squat' ? '🧍 전신이 보이도록 서주세요' : '💪 상체가 보이도록 위치하세요'}
+              </Text>
+              <Text style={styles.guideSubText}>
+                {exerciseNameMap[selectedExercise]} 준비
+              </Text>
+            </View>
           </View>
         )}
 
-        {/* 시작/중지 버튼 */}
-        <TouchableOpacity
-          style={[
-            styles.startLongButton,
-            {
-              width: Math.min(screenWidth * 0.9, 420),
-              height: Math.max(screenHeight * 0.065, 48),
-            },
-            (!selectedExercise || !cameraActive) && styles.startLongButtonDisabled,
-            isRunning && styles.stopButton, // 운동 중일 때 스타일 변경
-          ]}
-          onPress={() => {
-            console.log('[EWAI] 🔴 Button pressed - selectedExercise:', selectedExercise, 'cameraActive:', cameraActive, 'isRunning:', isRunning);
-            handleStartStop();
-          }}
-          disabled={!isRunning && (!selectedExercise || !cameraActive)}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.startLongButtonText}>
-            {isRunning ? '🛑 운동 중지' : '운동 시작'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+        {/* ⚡ 섬광 효과 (Flash Feedback) */}
+        {flashColor && (
+          <View 
+            style={[
+              styles.flashOverlay,
+              flashColor === 'green' && styles.flashGreen,
+              flashColor === 'yellow' && styles.flashYellow,
+              flashColor === 'red' && styles.flashRed,
+            ]} 
+          />
+        )}
 
-      {/* Stats */}
-      {isRunning && (
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Text style={styles.statLabel}>횟수</Text>
-            <Text style={styles.statValue}>{exerciseCount}</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statLabel}>점수</Text>
-            <Text style={[
-              styles.statValue, 
-              { color: score >= 85 ? '#4CAF50' : score >= 60 ? '#FFC107' : '#F44336' }
-            ]}>
-              {score}
+        {/* Debug HUD */}
+        <View style={styles.debugHud}>
+          <Text style={styles.debugLine}>
+            카메라:{' '}
+            <Text style={{ color: isForeground && cameraActive ? '#4CAF50' : '#F44336' }}>
+              {isForeground && cameraActive ? '활성' : '비활성'}
             </Text>
-          </View>
-        </View>
-      )}
+            {format && ` | ${format.videoWidth}x${format.videoHeight}@${format.maxFps}fps`}
+            {` | FP: ${fpTicks}`}
+          </Text>
 
-      {/* Feedback - 운동 중일 때 크게 표시 */}
-      <View style={[
-        styles.feedbackContainer,
-        isRunning && styles.feedbackContainerExpanded
-      ]}>
-        <Text style={[
-          styles.feedback,
-          isRunning && styles.feedbackExpanded
+          <Text style={styles.debugLine}>
+            플러그인:{' '}
+            <Text style={{ color: pluginOk ? '#4CAF50' : '#F44336' }}>
+              {pluginOk ? 'OK' : 'MISSING'}
+            </Text>
+          </Text>
+
+          <Text style={styles.debugLine}>
+            백엔드:{' '}
+            <Text style={{ color: backendOk == null ? '#FFD54F' : backendOk ? '#4CAF50' : '#F44336' }}>
+              {backendOk == null ? '대기' : backendOk ? 'OK' : '오류'}
+            </Text>
+            {lastLatency != null && ` | ${lastLatency}ms`}
+            {lastResultAt && ` | ${lastResultAt}`}
+          </Text>
+
+          <Text style={styles.debugLine}>
+            인식:{' '}
+            <Text style={{ color: personDetected == null ? '#FFD54F' : personDetected ? '#4CAF50' : '#F44336' }}>
+              {personDetected == null ? '대기' : personDetected ? '인식중' : '사람없음'}
+            </Text>
+            {lastPose && ` | ${lastPose}`}
+          </Text>
+        </View>
+
+        {/* Controls */}
+        <View style={styles.controls}>
+          {/* 운동 선택 버튼들 - 운동 시작 전에만 표시 */}
+          {!isRunning && (
+            <View style={styles.selectionRow}>
+              {Object.entries(exerciseNameMap).map(([key, name], idx) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    styles.exerciseTile,
+                    { width: tileSize, height: tileSize },
+                    selectedExercise === key && styles.exerciseTileSelected,
+                    idx === 0 ? { marginRight: 12 } : { marginLeft: 12 },
+                  ]}
+                  onPress={() => setSelectedExercise(key)}
+                  activeOpacity={0.9}
+                >
+                  <Text
+                    style={[
+                      styles.exerciseTileText,
+                      selectedExercise === key && styles.exerciseTileTextSelected,
+                    ]}
+                  >
+                    {name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* 시작/중지 버튼 */}
+          <TouchableOpacity
+            style={[
+              styles.startLongButton,
+              {
+                width: Math.min(screenWidth * 0.9, 420),
+                height: Math.max(screenHeight * 0.065, 48),
+              },
+              (!selectedExercise || !cameraActive) && styles.startLongButtonDisabled,
+              isRunning && styles.stopButton, // 운동 중일 때 스타일 변경
+            ]}
+            onPress={() => {
+              console.log('[EWAI] 🔴 Button pressed - selectedExercise:', selectedExercise, 'cameraActive:', cameraActive, 'isRunning:', isRunning);
+              handleStartStop();
+            }}
+            disabled={!isRunning && (!selectedExercise || !cameraActive)}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.startLongButtonText}>
+              {isRunning ? '🛑 운동 중지' : '운동 시작'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Stats */}
+        {isRunning && (
+          <View style={styles.statsContainer}>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>횟수</Text>
+              <Text style={styles.statValue}>{exerciseCount}</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>점수</Text>
+              <Text style={[
+                styles.statValue, 
+                { color: score >= 85 ? '#4CAF50' : score >= 60 ? '#FFC107' : '#F44336' }
+              ]}>
+                {score}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Feedback - 운동 중일 때 크게 표시 */}
+        <View style={[
+          styles.feedbackContainer,
+          isRunning && styles.feedbackContainerExpanded
         ]}>
-          💬 {feedback}
-        </Text>
+          <Text style={[
+            styles.feedback,
+            isRunning && styles.feedbackExpanded
+          ]}>
+            💬 {feedback}
+          </Text>
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
   container: { flex: 1, backgroundColor: 'black' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'black' },
   permissionText: { fontSize: 18, color: 'white', textAlign: 'center', fontWeight: 'bold', marginBottom: 10 },
@@ -850,7 +910,7 @@ const styles = StyleSheet.create({
 
   feedbackContainer: {
     position: 'absolute',
-    bottom: '35%',
+    bottom: '27%',
     left: 20,
     right: 20,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -858,7 +918,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   feedbackContainerExpanded: {
-    bottom: '30%', // 더 위로 올림
+    bottom: '22%',
     left: 10,
     right: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.9)', // 더 진하게

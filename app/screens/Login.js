@@ -195,21 +195,23 @@ const Login = () => {
 export default Login;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: '#0B132B' },
   scrollContainer: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   logoContainer: { alignItems: 'center', marginBottom: 48 },
-  title: { fontSize: 32, color: '#fff', fontWeight: 'bold', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#aaa', textAlign: 'center' },
+  title: { fontSize: 32, color: '#F4F9FF', fontWeight: 'bold', marginBottom: 8 },
+  subtitle: { fontSize: 16, color: '#AFC6FF', textAlign: 'center' },
   formContainer: { marginBottom: 32 },
   inputContainer: { marginBottom: 16 },
   input: {
     width: '100%',
     height: 48,
-    borderRadius: 8,
-    backgroundColor: '#fff',
+    borderRadius: 12,
+    backgroundColor: 'rgba(15, 42, 72, 0.85)',
     paddingHorizontal: 16,
-    color: '#000',
-    fontSize: 16
+    color: '#F5FBFF',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(128, 176, 255, 0.35)'
   },
   inputError: {
     borderWidth: 1,
@@ -222,7 +224,7 @@ const styles = StyleSheet.create({
     marginLeft: 4
   },
   loginButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#3E8EFF',
     width: '100%',
     paddingVertical: 14,
     borderRadius: 8,
@@ -242,28 +244,28 @@ const styles = StyleSheet.create({
     marginTop: 16
   },
   forgotPasswordText: {
-    color: '#007bff',
+    color: '#9DBCFF',
     fontSize: 14
   },
   signupContainer: {
     alignItems: 'center'
   },
   signupPromptText: {
-    color: '#aaa',
+    color: '#C7D5F8',
     fontSize: 14,
     marginBottom: 12
   },
   signupButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(25, 62, 94, 0.6)',
     borderWidth: 1,
-    borderColor: '#28a745',
+    borderColor: 'rgba(86, 220, 210, 0.6)',
     width: '100%',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center'
   },
   signupButtonText: {
-    color: '#28a745',
+    color: '#52E0C8',
     fontSize: 16,
     fontWeight: '600'
   },

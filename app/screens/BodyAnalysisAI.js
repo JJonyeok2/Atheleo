@@ -1,5 +1,6 @@
 // app/screens/BodyAnalysisAI.js
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import AnalysisVisualization from '../../components/AnalysisVisualization';
 import { BASE_API_URL } from '../config';
@@ -21,12 +23,31 @@ import axios from 'axios';
 const BODY_ANALYSIS_API_URL = BASE_API_URL + 'body-analysis/';
 
 export default function BodyAnalysisAI() {
+  const navigation = useNavigation();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [imageUri, setImageUri] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [imageLayout, setImageLayout] = useState(null);
+  const [hasAccess, setHasAccess] = useState(!!user);
+
+  useEffect(() => {
+    if (!user) {
+      setHasAccess(false);
+      Alert.alert(
+        '로그인이 필요합니다',
+        '체형 분석 기능은 로그인 후 이용하실 수 있어요.',
+        [
+          { text: '로그인으로 이동', onPress: () => navigation.replace('Login') },
+          { text: '뒤로가기', style: 'cancel', onPress: () => navigation.goBack() },
+        ],
+      );
+    } else {
+      setHasAccess(true);
+    }
+  }, [navigation, user]);
 
   const handleImageSelection = (response) => {
     if (response.didCancel) {
@@ -163,17 +184,26 @@ export default function BodyAnalysisAI() {
       </View>
     );
   };
+  if (!hasAccess) {
+    return (
+      <SafeAreaView style={styles.page}>
+        <StatusBar barStyle="light-content" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.page}>
       <StatusBar barStyle="light-content" />
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 54 }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.hero}>
+        <View style={[styles.hero, { paddingTop: insets.top + 46 }]}>
           <Text style={styles.title}>AI 체형 분석</Text>
-          <Text style={styles.subtitle}>정면 전신 사진을 업로드하면, 딥러닝 기술을 활용해서 체형을 진단해드려요.</Text>
+          <Text style={styles.subtitle}>
+            전신 사진 한 장으로 체형 비율과 특징을 분석해 정확한 운동 가이드를 제공합니다.
+          </Text>
         </View>
 
         <View style={styles.buttonRow}>

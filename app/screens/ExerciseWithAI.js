@@ -7,6 +7,7 @@ import {
   Button,
   Dimensions,
   Linking,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -24,9 +25,18 @@ import {
   VisionCameraProxy,
 } from 'react-native-vision-camera';
 
+import axios from 'axios';
 import { BASE_API_URL } from '../config';
 import { useAuth } from './Authcontext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Tts from 'react-native-tts';
+import { 
+  getExerciseRoutine, 
+  getExerciseRoutineByBodyShape,
+  checkGoalAchievement,
+  shouldRest 
+} from '../utils/exerciseRoutines';
+import { savePendingHistory, syncAllPendingHistory } from '../utils/historySync';
 
 export default function ExerciseWithAI() {
   const navigation = useNavigation();
@@ -64,6 +74,63 @@ export default function ExerciseWithAI() {
     setHasAccess(true);
   }, [navigation, user]);
 
+  // 체형 정보 불러오기 및 루틴 추천 알림
+  useEffect(() => {
+    const loadBodyShapeAndRecommend = async () => {
+      try {
+        const storedBodyShape = await AsyncStorage.getItem('userBodyShape');
+        if (storedBodyShape) {
+          setBodyShape(storedBodyShape);
+          console.log('[EWAI] 체형 정보 로드:', storedBodyShape);
+          
+          // 운동 화면 진입 시 루틴 추천 알림 (한 번만 표시)
+          const hasShownRecommendation = await AsyncStorage.getItem('hasShownRoutineRecommendation');
+          if (!hasShownRecommendation) {
+            const routine = getExerciseRoutineByBodyShape(storedBodyShape);
+            const exerciseRoutine = getExerciseRoutine(storedBodyShape, 'squat'); // 기본값: 스쿼트
+            
+            Alert.alert(
+              '💪 추천 루틴',
+              `당신의 체형(${storedBodyShape})에 맞는 ${routine.levelName} 난이도 루틴이 준비되었습니다.\n\n` +
+              `📋 추천 루틴:\n` +
+              `• 스쿼트: ${exerciseRoutine.targetReps}회 × ${exerciseRoutine.sets}세트\n` +
+              `• 쉬는 시간: ${exerciseRoutine.restTime}초\n` +
+              `• 최소 점수: ${exerciseRoutine.minScore}점 이상\n\n` +
+              `이 루틴으로 진행하시겠습니까?`,
+              [
+                {
+                  text: '추천 루틴으로 시작',
+                  onPress: () => {
+                    console.log('[EWAI] 추천 루틴으로 시작');
+                    // 루틴 정보는 이미 bodyShape state에 저장되어 있음
+                  },
+                  style: 'default',
+                },
+                {
+                  text: '직접 설정',
+                  onPress: () => {
+                    console.log('[EWAI] 직접 설정 선택');
+                  },
+                  style: 'cancel',
+                },
+              ],
+              { cancelable: true }
+            );
+            
+            // 알림 표시 플래그 저장
+            await AsyncStorage.setItem('hasShownRoutineRecommendation', 'true');
+          }
+        }
+      } catch (error) {
+        console.error('[EWAI] 체형 정보 로드 실패:', error);
+      }
+    };
+    
+    if (hasAccess) {
+      loadBodyShapeAndRecommend();
+    }
+  }, [hasAccess]);
+
   // ─────────────────────────────────────────────────────────────
   // Camera device & format
   // ─────────────────────────────────────────────────────────────
@@ -81,7 +148,7 @@ export default function ExerciseWithAI() {
   const [isForeground, setIsForeground] = useState(true);
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [feedback, setFeedback] = useState('운동을 선택하고 시작 버튼을 누르세요.');
-  const [score, setScore] = useState(0);
+  const [score, setScore] = useState(50); // 초기 점수 50점
   const [exerciseCount, setExerciseCount] = useState(0);
   const [exerciseStage, setExerciseStage] = useState('UP');
   const [backendOk, setBackendOk] = useState(null);
@@ -94,6 +161,15 @@ export default function ExerciseWithAI() {
   const [cameraActive, setCameraActive] = useState(false);
   const [flashColor, setFlashColor] = useState(null); // 섬광 효과: 'green', 'red', null
   const [lastValidPose, setLastValidPose] = useState('UP'); // 🔥 State로 관리: 서버 전송용 최신 pose
+  const [bodyShape, setBodyShape] = useState(null); // 체형 정보
+  const [currentSet, setCurrentSet] = useState(1); // 현재 세트
+  const [lastRestTime, setLastRestTime] = useState(0); // 마지막 쉬는 시간
+  const [isResting, setIsResting] = useState(false); // 쉬는 중 여부
+  const [restCountdown, setRestCountdown] = useState(0); // 쉬는 시간 카운트다운
+  const [scoreHistory, setScoreHistory] = useState([]); // 점수 기록 (평균 계산용)
+  const [startTime, setStartTime] = useState(null); // 운동 시작 시간
+  const [downStateStartTime, setDownStateStartTime] = useState(null); // DOWN 상태 시작 시간
+  const downStateStartTimeRef = useRef(null); // DOWN 상태 시작 시간 ref
 
   // Refs (worklet↔JS 브리지에서 최신값 보장)
   const exerciseStageRef = useRef(exerciseStage);
@@ -103,13 +179,30 @@ export default function ExerciseWithAI() {
   const fpDebugCountRef = useRef(0);
   const lastServerSendTimeRef = useRef(0); // 마지막 서버 전송 시간 (ms)
   const lastTtsTimeRef = useRef(0); // 마지막 음성 안내 시간 (ms)
-  const lastTtsTextRef = useRef(''); // 마지막 음성 안내 텍스트 (중복 방지)
+  const lastTtsTextRef = useRef(''); // 마지막 음성 안내 텍스트
+  const isTtsSpeakingRef = useRef(false); // TTS 재생 중 여부 추적 (겹침 방지)
+  const previousAngleRef = useRef(null); // 이전 각도 (점수 증감 계산용)
+  const scoreRef = useRef(50); // 현재 점수 (ref로 관리하여 최신 값 보장) (중복 방지)
 
   // 🔊 TTS 초기화
   useEffect(() => {
     Tts.setDefaultLanguage('ko-KR'); // 한국어 설정
-    Tts.setDefaultRate(0.5); // 말하기 속도 (0.0 ~ 1.0)
+    Tts.setDefaultRate(0.5); // 말하기 속도 (0.0 ~ 1.0) - 더 느린 속도
     Tts.setDefaultPitch(1.0); // 음성 높이
+    
+    // iOS에서 사용 가능한 한국어 음성 자동 선택
+    if (Platform.OS === 'ios') {
+      Tts.voices().then((voices) => {
+        const koreanVoice = voices.find(
+          (voice) => voice.language.startsWith('ko') && !voice.name.includes('enhanced')
+        );
+        if (koreanVoice) {
+          Tts.setDefaultVoice(koreanVoice.id);
+        }
+      }).catch(() => {
+        // 음성 목록을 가져올 수 없으면 기본 음성 사용
+      });
+    }
     
     // 경고 제거를 위한 이벤트 리스너 (선택적)
     Tts.addEventListener('tts-start', () => {});
@@ -144,6 +237,11 @@ export default function ExerciseWithAI() {
       console.log(`[EWAI] 🔄 exerciseStage: ${exerciseStage}`);
     }
   }, [exerciseStage]);
+
+  // score state와 ref 동기화
+  useEffect(() => {
+    scoreRef.current = score;
+  }, [score]);
   
   useEffect(() => {
     exerciseCountRef.current = exerciseCount;
@@ -156,12 +254,17 @@ export default function ExerciseWithAI() {
 
   // 🔊 음성 안내: 피드백 변경 시
   useEffect(() => {
-    if (!isRunning || !feedback) return;
+    if (!isRunning || !feedback || isResting) return; // 쉬는 시간 중에는 TTS 비활성화
     
-    // 중복 방지: 같은 텍스트는 3초 이내에 다시 말하지 않음
+    // TTS 재생 중이면 새 TTS 재생하지 않음 (겹침 방지)
+    if (isTtsSpeakingRef.current) {
+      return;
+    }
+    
+    // 중복 방지: 같은 텍스트는 2초 이내에 다시 말하지 않음 (프레임 전송 간격과 동일)
     const now = Date.now();
     const timeSinceLastTts = now - lastTtsTimeRef.current;
-    const MIN_TTS_INTERVAL = 3000; // 3초
+    const MIN_TTS_INTERVAL = 2000; // 2초 (프레임 전송 간격과 동일)
     
     if (feedback === lastTtsTextRef.current && timeSinceLastTts < MIN_TTS_INTERVAL) {
       return; // 중복 방지
@@ -171,53 +274,117 @@ export default function ExerciseWithAI() {
     const importantKeywords = ['완벽', '좋아', '교정', '무릎', '깊이', '각도', '자세'];
     const isImportant = importantKeywords.some(keyword => feedback.includes(keyword));
     
-    if (isImportant || feedback.length < 30) { // 짧은 피드백은 항상 읽기
-      // 발음이 명확한 문장으로 변환
-      let ttsText = feedback;
-      
-      // "사람을 감지할 수 없습니다" → "카메라 앞에 서주세요"
-      if (feedback.includes('사람을 감지') || feedback.includes('사람을 인식')) {
-        ttsText = '카메라 앞에 서주세요.';
-      } else if (feedback.includes('감지할 수 없습니다')) {
-        ttsText = '자세를 확인할 수 없습니다.';
+    // 긴 피드백은 요약하거나 생략 (30자 이상은 요약)
+    let ttsText = feedback;
+    if (feedback.length > 30) {
+      // 긴 피드백은 핵심만 추출
+      if (feedback.includes('무릎')) {
+        ttsText = '무릎 각도를 조정하세요.';
+      } else if (feedback.includes('팔꿈치')) {
+        ttsText = '팔꿈치 각도를 조정하세요.';
+      } else if (feedback.includes('깊이')) {
+        ttsText = '더 깊이 내려가세요.';
+      } else if (feedback.includes('완벽') || feedback.includes('좋아')) {
+        ttsText = '완벽해요';
+      } else {
+        // 너무 길면 생략
+        return;
       }
-      
+    }
+    
+    // "사람을 감지할 수 없습니다" → "카메라 앞에 서주세요"
+    if (feedback.includes('사람을 감지') || feedback.includes('사람을 인식')) {
+      ttsText = '카메라 앞에 서주세요.';
+    } else if (feedback.includes('감지할 수 없습니다')) {
+      ttsText = '자세를 확인할 수 없습니다.';
+    }
+    
+    // 중요한 피드백이거나 짧은 피드백만 읽기
+    if (isImportant || feedback.length < 30) {
+      isTtsSpeakingRef.current = true;
       lastTtsTimeRef.current = now;
       lastTtsTextRef.current = feedback;
+      
       Tts.speak(ttsText, {
         androidParams: {
           KEY_PARAM_PAN: -1,
-          KEY_PARAM_VOLUME: 0.8,
+          KEY_PARAM_VOLUME: 0.9,
           KEY_PARAM_STREAM: 'STREAM_MUSIC',
+          KEY_PARAM_ENGINE: 'com.google.android.tts',
         },
       });
+      
+      // TTS 재생 완료 추정 시간 후 플래그 해제 (메시지 길이에 따라 조정)
+      const estimatedDuration = Math.max(1000, ttsText.length * 100); // 글자당 100ms 추정
+      setTimeout(() => {
+        isTtsSpeakingRef.current = false;
+      }, estimatedDuration);
+      
       console.log(`[TTS] 🔊 "${ttsText}"`);
     }
-  }, [feedback, isRunning]);
+  }, [feedback, isRunning, isResting]);
 
   // 🔊 음성 안내: 횟수 증가 시
   useEffect(() => {
-    if (!isRunning || exerciseCount === 0) return;
+    if (!isRunning || exerciseCount === 0 || isResting) return; // 쉬는 시간 중에는 TTS 비활성화
+    
+    // TTS 재생 중이면 새 TTS 재생하지 않음 (겹침 방지)
+    if (isTtsSpeakingRef.current) {
+      return;
+    }
     
     const now = Date.now();
     const timeSinceLastTts = now - lastTtsTimeRef.current;
-    const MIN_TTS_INTERVAL = 2000; // 2초
+    const MIN_TTS_INTERVAL = 2000; // 2초 (프레임 전송 간격과 동일)
     
     if (timeSinceLastTts < MIN_TTS_INTERVAL) {
       return; // 너무 자주 말하지 않음
     }
     
+    isTtsSpeakingRef.current = true;
     lastTtsTimeRef.current = now;
     const countText = `${exerciseCount}회 완료`;
+    
     Tts.speak(countText, {
       androidParams: {
         KEY_PARAM_PAN: -1,
         KEY_PARAM_VOLUME: 0.9,
         KEY_PARAM_STREAM: 'STREAM_MUSIC',
+        KEY_PARAM_ENGINE: 'com.google.android.tts',
       },
     });
+    
+    // TTS 재생 완료 추정 시간 후 플래그 해제
+    const estimatedDuration = 1500; // "N회 완료"는 약 1.5초
+    setTimeout(() => {
+      isTtsSpeakingRef.current = false;
+    }, estimatedDuration);
+    
     console.log(`[TTS] 🔊 "${countText}"`);
-  }, [exerciseCount, isRunning]);
+  }, [exerciseCount, isRunning, isResting]);
+
+  // 쉬는 시간 카운트다운
+  useEffect(() => {
+    if (!isResting || restCountdown <= 0) {
+      if (isResting && restCountdown <= 0) {
+        setIsResting(false);
+        Tts.speak('쉬는 시간 종료. 다음 세트를 시작하세요.');
+      }
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setRestCountdown((prev) => {
+        if (prev <= 1) {
+          setIsResting(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isResting, restCountdown]);
 
   // Layout sizes
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -302,60 +469,331 @@ export default function ExerciseWithAI() {
     // 🔍 개수 증가 로직
     const newPose = result?.pose;
     
-    // TRANSITION 상태는 무시 (중간 상태)
+    // 🔥 중요: 카운트 체크를 stage 업데이트 전에 실행!
+    // exerciseStageRef.current를 사용하여 이전 stage 확인 (즉시 반영)
+    const previousStage = exerciseStageRef.current;
+    
+    // TRANSITION 상태 처리 개선
+    // TRANSITION은 DOWN → UP 또는 UP → DOWN 중간 상태
+    // 이전 stage가 DOWN이고 TRANSITION이면, DOWN 상태로 간주하여 시간 추적
+    // UP → TRANSITION → UP 전환도 카운트 (빠른 운동 감지)
     if (newPose === 'TRANSITION') {
-      console.log(`[COUNT] pose=TRANSITION → 무시`);
+      // DOWN → TRANSITION: DOWN 상태 시간 계속 추적
+      if (previousStage === 'DOWN') {
+        // DOWN 상태 시간이 없으면 지금 시작
+        if (!downStateStartTimeRef.current) {
+          const now = Date.now();
+          downStateStartTimeRef.current = now;
+          setDownStateStartTime(now);
+          console.log(`[COUNT] ⬇️ DOWN → TRANSITION: DOWN 시간 추적 시작`);
+        }
+        console.log(`[COUNT] pose=TRANSITION (DOWN 상태 유지 중, 경과: ${Date.now() - downStateStartTimeRef.current}ms)`);
+      } 
+      // UP → TRANSITION: DOWN 시간 추적하지 않음 (UP 상태는 DOWN이 아님)
+      else if (previousStage === 'UP') {
+        // UP에서 TRANSITION으로 전환되면 DOWN 시간 추적 초기화
+        if (downStateStartTimeRef.current) {
+          downStateStartTimeRef.current = null;
+          setDownStateStartTime(null);
+          console.log(`[COUNT] ⬆️ UP → TRANSITION: DOWN 시간 추적 초기화 (UP 상태 유지)`);
+        }
+        console.log(`[COUNT] pose=TRANSITION (UP → TRANSITION, stage 유지: ${previousStage})`);
+      } else {
+        console.log(`[COUNT] pose=TRANSITION → stage 유지 (${previousStage})`);
+      }
+      // TRANSITION 상태에서는 stage를 변경하지 않음
       return;
     }
     
-    console.log(`[COUNT] pose=${newPose}, stage=${currentStage}`);
+    console.log(`[COUNT] pose=${newPose}, currentStage=${currentStage}, previousStage(ref)=${previousStage}`);
+    
+    // DOWN 상태 시작 시간 추적
+    if (newPose === 'DOWN' && previousStage !== 'DOWN') {
+      // DOWN 상태로 진입한 시점 기록
+      const now = Date.now();
+      downStateStartTimeRef.current = now;
+      setDownStateStartTime(now);
+      console.log(`[COUNT] ⬇️ DOWN 상태 진입 (시작 시간 기록)`);
+    }
+    // ⚠️ 중요: UP으로 전환될 때는 시간을 초기화하지 않음 (카운트 체크 후에 초기화)
+    // TRANSITION에서 UP으로 전환될 때도 DOWN 시간이 유지되어야 함
     
     // UP으로 올라올 때만 카운트 (DOWN에서 UP으로 전환)
-    if (newPose === 'UP' && currentStage === 'DOWN') {
+    // ref를 사용하여 이전 stage를 정확히 확인
+    // 최소 DOWN 유지 시간을 0ms로 설정하여 즉시 카운트 (빠른 운동도 감지)
+    const MIN_DOWN_DURATION = 0; // 최소 DOWN 유지 시간 (밀리초) - 0ms로 설정하여 즉시 카운트
+    const downDuration = downStateStartTimeRef.current 
+      ? Date.now() - downStateStartTimeRef.current 
+      : 0;
+    
+    // DOWN → UP 전환만 카운트 (엄격한 조건)
+    // previousStage가 'DOWN'이거나, currentStage가 'DOWN'일 때만 카운트
+    // UP 상태에서는 절대 카운트하지 않음
+    const wasDownState = previousStage === 'DOWN' || currentStage === 'DOWN';
+    
+    if (newPose === 'UP' && wasDownState) {
+      // DOWN 상태였으면 즉시 카운트 (최소 시간 제한 없음)
+      // TRANSITION을 거쳐서 UP으로 전환된 경우도 포함 (TRANSITION 중에도 DOWN 시간이 추적됨)
+      console.log(`[COUNT] 🔍 DOWN → UP 전환 체크: previousStage=${previousStage}, currentStage=${currentStage}, downStateStartTimeRef=${downStateStartTimeRef.current}, downDuration=${downDuration}ms`);
+      
+      // TRANSITION에서 UP으로 전환된 경우, DOWN 시간이 없어도 카운트
+      // DOWN 상태였으면 무조건 카운트 (TRANSITION은 DOWN → UP 중간 상태)
+      // UP → TRANSITION → DOWN → UP 전환도 카운트 (빠른 운동 감지)
+      let actualDownDuration = downDuration;
+      if (downDuration === 0 && wasDownState) {
+        // TRANSITION을 거쳤지만 시간이 초기화된 경우, DOWN 상태였으므로 카운트
+        // 또는 UP → TRANSITION → DOWN → UP 전환 (빠른 운동)
+        console.log(`[COUNT] ⚠️ TRANSITION에서 UP 전환: DOWN 시간이 0이지만 카운트 (previousStage=${previousStage}, currentStage=${currentStage}, wasDownState=${wasDownState})`);
+        actualDownDuration = 1; // 0이 아닌 값으로 설정하여 카운트
+      }
+      
+      // 최소 시간 제한 없이 즉시 카운트
+      if (actualDownDuration >= MIN_DOWN_DURATION) {
       setExerciseCount((prev) => {
         const newCount = prev + 1;
-        console.log(`[COUNT] 🎉 ${prev} → ${newCount}`);
+        console.log(`[COUNT] 🎉 ${prev} → ${newCount} (DOWN → UP 전환 감지! previousStage=${previousStage}, currentStage=${currentStage}, newPose=${newPose}, downDuration=${actualDownDuration}ms)`);
+        
+        // 체형별 루틴에 따른 목표 달성 확인 및 세트 증가
+        if (bodyShape && selectedExerciseRef.current) {
+          const currentSetForCheck = currentSet; // 현재 세트 사용
+          const goalInfo = checkGoalAchievement(
+            bodyShape,
+            selectedExerciseRef.current,
+            newCount,
+            currentSetForCheck
+          );
+          
+          console.log(`[ROUTINE] 목표 달성 체크:`, {
+            bodyShape,
+            exercise: selectedExerciseRef.current,
+            currentReps: newCount,
+            currentSet: currentSetForCheck,
+            targetReps: goalInfo.targetReps,
+            targetSets: goalInfo.targetSets,
+            isRepGoalReached: goalInfo.isRepGoalReached,
+            isSetGoalReached: goalInfo.isSetGoalReached,
+          });
+          
+          // 목표 횟수 달성 시 세트 증가 및 쉬는 시간 시작
+          if (goalInfo.isRepGoalReached && !goalInfo.isSetGoalReached) {
+            setCurrentSet((prevSet) => {
+              const nextSet = prevSet + 1;
+              console.log(`[ROUTINE] 세트 ${prevSet} 완료 → 세트 ${nextSet} 시작`);
+              
+              // 쉬는 시간 시작
+              if (nextSet <= goalInfo.targetSets) {
+                setIsResting(true);
+                setLastRestTime(Date.now());
+                const routine = getExerciseRoutine(bodyShape, selectedExerciseRef.current);
+                setRestCountdown(routine.restTime);
+                
+                // 쉬는 시간 안내
+                Tts.speak(`세트 완료. ${routine.restTime}초 쉬세요.`, {
+                  androidParams: {
+                    KEY_PARAM_VOLUME: 0.9,
+                    KEY_PARAM_STREAM: 'STREAM_MUSIC',
+                  },
+                });
+              }
+              
+              return nextSet;
+            });
+          }
+        }
+        
         return newCount;
       });
+      } else {
+        console.log(`[COUNT] ⚠️ DOWN → UP 전환 감지했지만 DOWN 유지 시간 부족 (${actualDownDuration}ms < ${MIN_DOWN_DURATION}ms) - 카운트 안 함`);
+      }
     }
     
     // exerciseStage 업데이트 (UP 또는 DOWN만)
+    // 카운트 체크 후에 stage를 업데이트하여 다음 프레임에서 올바르게 반영
     if (newPose === 'UP' || newPose === 'DOWN') {
-      setExerciseStage(newPose);
-      exerciseStageRef.current = newPose; // State용 ref 동기화
-      setLastValidPose(newPose); // 🔥 State 업데이트: worklet이 감지 가능!
-      console.log(`[STAGE] ${currentStage} → ${newPose} (lastValidPose 업데이트)`);
+      // stage가 변경되는 경우에만 업데이트
+      if (previousStage !== newPose) {
+        console.log(`[STAGE] ${previousStage} → ${newPose} (변경 감지, ref 업데이트)`);
+        
+        // UP 상태로 전환될 때 DOWN 시간 초기화
+        if (newPose === 'UP') {
+          // UP 상태로 전환되면 DOWN 시간 추적 초기화
+          if (downStateStartTimeRef.current) {
+            console.log(`[STAGE] ${previousStage} → UP: DOWN 시간 초기화`);
+            downStateStartTimeRef.current = null;
+            setDownStateStartTime(null);
+          }
+        }
+        
+        // 🔥 ref를 즉시 업데이트하여 다음 프레임에서 정확한 이전 stage 확인 가능
+        exerciseStageRef.current = newPose; // ref 먼저 업데이트 (다음 프레임을 위해)
+        setExerciseStage(newPose); // state 업데이트 (비동기)
+        setLastValidPose(newPose); // 🔥 State 업데이트: worklet이 감지 가능!
+      } else {
+        console.log(`[STAGE] 유지: ${newPose} (변경 없음)`);
+      }
     } else if (!newPose) {
       console.log(`[STAGE] ❌ pose 값 없음!`);
     }
 
-    // 간단 점수 로직 (서버 각도 활용)
-    let newScore = 0;
+    // 🔍 점수 계산 전 디버깅 로그
+    console.log('[SCORE] result:', {
+      pose: result?.pose,
+      angles: result?.angles,
+      exercise: currentExercise,
+      hasLeftElbow: !!result?.angles?.left_elbow,
+      hasRightElbow: !!result?.angles?.right_elbow,
+      hasLeftKnee: !!result?.angles?.left_knee,
+      hasRightKnee: !!result?.angles?.right_knee,
+    });
+
+    // 점수 증감 로직: 이전 각도와 비교하여 점수 조정
+    // 목표: 초기 50점에서 시작, 자세가 개선되면 +, 나빠지면 -
+    const TARGET_ANGLE = 90; // 목표 각도 (스쿼트, 푸쉬업 모두 90도)
+    const MAX_SCORE_CHANGE = 3; // 한 번에 최대 변경 가능한 점수 (±3점)
+    
     if (currentExercise === 'squat' && result?.angles) {
-      const kneeAngle = (result.angles.left_knee + result.angles.right_knee) / 2;
-      newScore = Math.max(0, Math.round(100 - Math.abs(90 - kneeAngle) * 2));
-      setScore(newScore);
+      const angles = result.angles;
+      const kneeAngles = [angles.left_knee, angles.right_knee].filter(a => a != null && !isNaN(a));
+      if (kneeAngles.length > 0) {
+        const avgKneeAngle = kneeAngles.reduce((a, b) => a + b, 0) / kneeAngles.length;
+        
+        // 현재 각도와 목표 각도(90도)의 차이
+        const currentDiff = Math.abs(TARGET_ANGLE - avgKneeAngle);
+        
+        // 이전 각도가 있으면 비교하여 점수 증감
+        if (previousAngleRef.current !== null) {
+          const previousDiff = Math.abs(TARGET_ANGLE - previousAngleRef.current);
+          
+          // 자세가 개선되었는지 확인 (목표 각도에 가까워졌는지)
+          const improvement = previousDiff - currentDiff;
+          
+          // 점수 증감 계산 (개선되면 +, 나빠지면 -)
+          // improvement가 양수면 개선, 음수면 악화
+          let scoreChange = 0;
+          if (improvement > 5) {
+            // 크게 개선됨 (+3점)
+            scoreChange = MAX_SCORE_CHANGE;
+          } else if (improvement > 2) {
+            // 조금 개선됨 (+2점)
+            scoreChange = 2;
+          } else if (improvement > 0.5) {
+            // 약간 개선됨 (+1점)
+            scoreChange = 1;
+          } else if (improvement < -5) {
+            // 크게 악화됨 (-3점)
+            scoreChange = -MAX_SCORE_CHANGE;
+          } else if (improvement < -2) {
+            // 조금 악화됨 (-2점)
+            scoreChange = -2;
+          } else if (improvement < -0.5) {
+            // 약간 악화됨 (-1점)
+            scoreChange = -1;
+          }
+          // improvement가 -0.5 ~ 0.5 사이면 변화 없음 (0점)
+          
+          // 현재 점수에 증감 적용 (0~100 범위 제한)
+          const currentScore = scoreRef.current;
+          const newScore = Math.max(0, Math.min(100, currentScore + scoreChange));
+          
+          setScore(newScore);
+          scoreRef.current = newScore; // ref 업데이트
+          
+          // 점수 기록에 추가 (평균 계산용)
+          setScoreHistory((prev) => [...prev, newScore].slice(-100)); // 최근 100개만 유지
+          
+          if (scoreChange !== 0) {
+            console.log(`[SCORE] ${scoreChange > 0 ? '+' : ''}${scoreChange}점 (${currentScore} → ${newScore}), 각도: ${previousAngleRef.current.toFixed(1)}° → ${avgKneeAngle.toFixed(1)}°`);
+            
+            // ⚡ 섬광 효과: 점수에 따라 3단계 색상 결정
+            let color;
+            if (newScore >= 85) {
+              color = 'green';  // 완벽! (85~100점)
+            } else if (newScore >= 60) {
+              color = 'yellow'; // 아쉬움 (60~84점)
+            } else {
+              color = 'red';    // 엉망 (0~59점)
+            }
+            setFlashColor(color);
+            // 500ms 후 섬광 효과 제거
+            setTimeout(() => setFlashColor(null), 500);
+          }
+        } else {
+          // 첫 번째 각도 측정: 이전 각도 저장만 (점수 변경 없음)
+          console.log(`[SCORE] 첫 각도 측정: ${avgKneeAngle.toFixed(1)}° (점수: ${scoreRef.current}점 유지)`);
+        }
+        
+        // 이전 각도 업데이트
+        previousAngleRef.current = avgKneeAngle;
+      }
     } else if (currentExercise === 'push_up' && result?.angles) {
-      const elbowAngle = (result.angles.left_elbow + result.angles.right_elbow) / 2;
-      newScore = Math.max(0, Math.round(100 - Math.abs(90 - elbowAngle) * 1.5));
-      setScore(newScore);
+      const angles = result.angles;
+      const elbowAngles = [angles.left_elbow, angles.right_elbow].filter(a => a != null && !isNaN(a));
+      if (elbowAngles.length > 0) {
+        const avgElbowAngle = elbowAngles.reduce((a, b) => a + b, 0) / elbowAngles.length;
+        
+        // 현재 각도와 목표 각도(90도)의 차이
+        const currentDiff = Math.abs(TARGET_ANGLE - avgElbowAngle);
+        
+        // 이전 각도가 있으면 비교하여 점수 증감
+        if (previousAngleRef.current !== null) {
+          const previousDiff = Math.abs(TARGET_ANGLE - previousAngleRef.current);
+          
+          // 자세가 개선되었는지 확인 (목표 각도에 가까워졌는지)
+          const improvement = previousDiff - currentDiff;
+          
+          // 점수 증감 계산 (개선되면 +, 나빠지면 -)
+          let scoreChange = 0;
+          if (improvement > 5) {
+            scoreChange = MAX_SCORE_CHANGE;
+          } else if (improvement > 2) {
+            scoreChange = 2;
+          } else if (improvement > 0.5) {
+            scoreChange = 1;
+          } else if (improvement < -5) {
+            scoreChange = -MAX_SCORE_CHANGE;
+          } else if (improvement < -2) {
+            scoreChange = -2;
+          } else if (improvement < -0.5) {
+            scoreChange = -1;
+          }
+          
+          // 현재 점수에 증감 적용 (0~100 범위 제한)
+          const currentScore = scoreRef.current;
+          const newScore = Math.max(0, Math.min(100, currentScore + scoreChange));
+          
+          setScore(newScore);
+          scoreRef.current = newScore; // ref 업데이트
+          
+          // 점수 기록에 추가 (평균 계산용)
+          setScoreHistory((prev) => [...prev, newScore].slice(-100)); // 최근 100개만 유지
+          
+          if (scoreChange !== 0) {
+            console.log(`[SCORE] ${scoreChange > 0 ? '+' : ''}${scoreChange}점 (${currentScore} → ${newScore}), 각도: ${previousAngleRef.current.toFixed(1)}° → ${avgElbowAngle.toFixed(1)}°`);
+            
+            // ⚡ 섬광 효과: 점수에 따라 3단계 색상 결정
+            let color;
+            if (newScore >= 85) {
+              color = 'green';  // 완벽! (85~100점)
+            } else if (newScore >= 60) {
+              color = 'yellow'; // 아쉬움 (60~84점)
+            } else {
+              color = 'red';    // 엉망 (0~59점)
+            }
+            setFlashColor(color);
+            // 500ms 후 섬광 효과 제거
+            setTimeout(() => setFlashColor(null), 500);
+          }
+        } else {
+          // 첫 번째 각도 측정: 이전 각도 저장만 (점수 변경 없음)
+          console.log(`[SCORE] 첫 각도 측정: ${avgElbowAngle.toFixed(1)}° (점수: ${scoreRef.current}점 유지)`);
+        }
+        
+        // 이전 각도 업데이트
+        previousAngleRef.current = avgElbowAngle;
+      }
     }
 
-    // ⚡ 섬광 효과: 점수에 따라 3단계 색상 결정
-    if (newScore > 0) {
-      let color;
-      if (newScore >= 85) {
-        color = 'green';  // 완벽! (85~100점)
-      } else if (newScore >= 60) {
-        color = 'yellow'; // 아쉬움 (60~84점)
-      } else {
-        color = 'red';    // 엉망 (0~59점)
-      }
-      setFlashColor(color);
-      // 로그 줄이기: 섬광은 로그 없이 시각적으로만
-      // 500ms 후 섬광 효과 제거
-      setTimeout(() => setFlashColor(null), 500);
-    }
   }, []);
 
   const sendFrameToServer = useCallback(
@@ -387,8 +825,8 @@ export default function ExerciseWithAI() {
         const result = await response.json();
         const t1 = Date.now();
 
-        // 🔍 서버 응답 로그 (개수 디버깅) - 간략하게
-        console.log(`[SERVER] 📥 pose=${result?.pose}, 전달stage=${stage}`);
+        // 🔍 서버 응답 로그 (개수 디버깅) - angles 데이터 포함
+        console.log(`[SERVER] 📥 pose=${result?.pose}, angles=${JSON.stringify(result?.angles)}, 전달stage=${stage}`);
 
         setBackendOk(true);
         setLastLatency(t1 - t0);
@@ -503,10 +941,10 @@ export default function ExerciseWithAI() {
       // 성공: 플러그인이 정상적으로 작동하고 있음
       setPluginOkJS(true);
 
-      // ⏱️ Throttle: 5초마다만 서버로 전송 (점수 안정화 + 섬광 효과를 위한 여유)
+      // ⏱️ Throttle: 2초마다 서버로 전송 (운동 동작 빠른 감지를 위해 간격 단축)
       const now = Date.now();
       const timeSinceLastSend = now - lastServerSendTimeRef.current;
-      const SEND_INTERVAL_MS = 5000; // 5초 간격
+      const SEND_INTERVAL_MS = 2000; // 2초 간격 (5초 → 2초로 단축)
       
       if (timeSinceLastSend >= SEND_INTERVAL_MS) {
         lastServerSendTimeRef.current = now;
@@ -534,7 +972,11 @@ export default function ExerciseWithAI() {
   // ─────────────────────────────────────────────────────────────
   const resetAllState = useCallback(() => {
     setSelectedExercise(null);
-    setScore(0);
+    setScore(50); // 초기 점수 50점
+    scoreRef.current = 50; // ref도 초기화
+    previousAngleRef.current = null; // 이전 각도 초기화
+    downStateStartTimeRef.current = null; // DOWN 시간 추적 초기화
+    setDownStateStartTime(null); // DOWN 시간 state 초기화
     setFeedback('운동을 선택하고 시작 버튼을 누르세요.');
     setExerciseCount(0);
     setExerciseStage('UP');
@@ -545,28 +987,120 @@ export default function ExerciseWithAI() {
     setPersonDetected(null);
     setLastPose(null);
     setFpTicks(0);
+    setCurrentSet(1);
+    setIsResting(false);
+    setRestCountdown(0);
+    setLastRestTime(0);
+    setScoreHistory([]);
+    setStartTime(null);
   }, []);
+
+  // 로컬 시간대를 포함한 ISO 문자열로 변환 (날짜 오류 방지)
+  const toLocalISOString = (date) => {
+    const tzOffset = -date.getTimezoneOffset(); // 분 단위 오프셋 (한국은 -540분, UTC+9)
+    const offsetHours = Math.floor(Math.abs(tzOffset) / 60);
+    const offsetMinutes = Math.abs(tzOffset) % 60;
+    const offsetSign = tzOffset >= 0 ? '+' : '-';
+    const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+    
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}${offsetString}`;
+  };
+
+  // 운동 기록 저장 (오프라인 대응)
+  const saveExerciseHistory = useCallback(async () => {
+    if (!user?.token || !selectedExercise || exerciseCount === 0) {
+      console.log('[EWAI] 운동 기록 저장 건너뜀:', { 
+        hasToken: !!user?.token, 
+        selectedExercise, 
+        exerciseCount 
+      });
+      return;
+    }
+
+    const averageScore = scoreHistory.length > 0
+      ? Math.round(scoreHistory.reduce((sum, s) => sum + s, 0) / scoreHistory.length)
+      : score;
+
+    // startTime이 없으면 현재 시간으로 설정
+    const startTimeValue = startTime || new Date();
+    const endTimeValue = new Date();
+
+    const historyData = {
+      exercise: selectedExercise,
+      total_reps: exerciseCount,
+      total_sets: currentSet || 1, // 최소 1세트
+      average_score: averageScore || 0, // 최소 0점
+      start_time: toLocalISOString(startTimeValue), // 로컬 시간대 포함
+      end_time: toLocalISOString(endTimeValue), // 로컬 시간대 포함
+    };
+
+    console.log('[EWAI] 📤 운동 기록 저장 시도:', historyData);
+
+    try {
+      // 먼저 서버에 저장 시도
+      await axios.post(
+        `${BASE_API_URL}exercise/history/`,
+        historyData,
+        {
+          headers: { Authorization: `Token ${user.token}` },
+          timeout: 5000, // 5초 타임아웃
+        }
+      );
+
+      console.log('[EWAI] ✅ 운동 기록 서버 저장 완료');
+    } catch (error) {
+      // 네트워크 오류 또는 서버 오류 시 로컬에 임시 저장
+      console.warn('[EWAI] ⚠️ 서버 저장 실패, 로컬에 임시 저장:', error.message);
+      if (error.response) {
+        console.error('[EWAI] 서버 응답:', error.response.data);
+        console.error('[EWAI] 서버 상태 코드:', error.response.status);
+        console.error('[EWAI] 전송한 데이터:', historyData);
+      }
+      
+      const saved = await savePendingHistory(historyData);
+      if (saved) {
+        console.log('[EWAI] ✅ 운동 기록 로컬 임시 저장 완료 (나중에 동기화됨)');
+      } else {
+        console.error('[EWAI] ❌ 로컬 저장도 실패');
+      }
+    }
+  }, [user?.token, selectedExercise, exerciseCount, currentSet, scoreHistory, score, startTime]);
 
   const handleStartStop = useCallback(() => {
     console.log('[EWAI] 🔘 handleStartStop called - isRunning:', isRunning, 'selectedExercise:', selectedExercise);
     if (isRunning) {
       console.log('[EWAI] 🛑 Stopping exercise');
+      // 운동 종료 시 기록 저장
+      saveExerciseHistory();
       setIsRunning(false);
       resetAllState();
     } else if (selectedExercise) {
       console.log('[EWAI] ▶️ Starting exercise:', selectedExercise);
       setExerciseCount(0);
       setExerciseStage('UP');
-      setScore(0);
+      setScore(50); // 초기 점수 50점
+      scoreRef.current = 50; // ref도 초기화
+      previousAngleRef.current = null; // 이전 각도 초기화
+      downStateStartTimeRef.current = null; // DOWN 시간 추적 초기화
+      setDownStateStartTime(null); // DOWN 시간 state 초기화
       setIsRunning(true);
       setFeedback('AI 분석을 시작합니다...');
+      setStartTime(new Date()); // 운동 시작 시간 기록
       lastServerSendTimeRef.current = 0; // ⏱️ 리셋: 즉시 첫 프레임 전송 가능
       setLastValidPose('UP'); // 초기 pose 설정
       console.log('[EWAI] ✅ setIsRunning(true) called - throttle reset');
     } else {
       console.log('[EWAI] ⚠️ No exercise selected');
     }
-  }, [isRunning, selectedExercise, resetAllState]);
+  }, [isRunning, selectedExercise, resetAllState, saveExerciseHistory]);
 
   const exerciseNameMap = {
     squat: '스쿼트',
@@ -774,6 +1308,14 @@ export default function ExerciseWithAI() {
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>횟수</Text>
               <Text style={styles.statValue}>{exerciseCount}</Text>
+              {bodyShape && selectedExercise && (() => {
+                const routine = getExerciseRoutine(bodyShape, selectedExercise);
+                return (
+                  <Text style={styles.statSubLabel}>
+                    목표: {routine.targetReps}회
+                  </Text>
+                );
+              })()}
             </View>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>점수</Text>
@@ -783,7 +1325,62 @@ export default function ExerciseWithAI() {
               ]}>
                 {score}
               </Text>
+              {bodyShape && selectedExercise && (() => {
+                const routine = getExerciseRoutine(bodyShape, selectedExercise);
+                return (
+                  <Text style={styles.statSubLabel}>
+                    최소: {routine.minScore}점
+                  </Text>
+                );
+              })()}
             </View>
+            {bodyShape && selectedExercise && (
+              <View style={styles.statBox}>
+                <Text style={styles.statLabel}>세트</Text>
+                <Text style={styles.statValue}>{currentSet}</Text>
+                {(() => {
+                  const routine = getExerciseRoutine(bodyShape, selectedExercise);
+                  return (
+                    <Text style={styles.statSubLabel}>
+                      목표: {routine.sets}세트
+                    </Text>
+                  );
+                })()}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* 쉬는 시간 표시 */}
+        {isResting && (
+          <View style={styles.restContainer}>
+            <Text style={styles.restTitle}>쉬는 시간</Text>
+            <Text style={styles.restCountdown}>{restCountdown}초</Text>
+            <Text style={styles.restSubtitle}>다음 세트 준비 중...</Text>
+          </View>
+        )}
+
+        {/* 루틴 정보 표시 (운동 시작 전) */}
+        {!isRunning && bodyShape && selectedExercise && (
+          <View style={styles.routineInfoContainer}>
+            <Text style={styles.routineInfoTitle}>💪 추천 루틴</Text>
+            {(() => {
+              const routine = getExerciseRoutineByBodyShape(bodyShape);
+              const exerciseRoutine = getExerciseRoutine(bodyShape, selectedExercise);
+              return (
+                <>
+                  <Text style={styles.routineInfoText}>
+                    난이도: {routine.levelName}
+                  </Text>
+                  <Text style={styles.routineInfoText}>
+                    목표: {exerciseRoutine.targetReps}회 × {exerciseRoutine.sets}세트
+                  </Text>
+                  <Text style={styles.routineInfoText}>
+                    쉬는 시간: {exerciseRoutine.restTime}초
+                  </Text>
+                </>
+              );
+            })()}
           </View>
         )}
 
@@ -1047,5 +1644,64 @@ const styles = StyleSheet.create({
   flashRed: {
     borderColor: 'rgba(244, 67, 54, 0.8)', // 빨간색 (엉망인 자세)
     backgroundColor: 'rgba(244, 67, 54, 0.1)',
+  },
+  statSubLabel: {
+    fontSize: 12,
+    color: '#B0BEC5',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  restContainer: {
+    position: 'absolute',
+    top: '35%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    paddingVertical: 24,
+    paddingHorizontal: 32,
+    marginHorizontal: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#0A84FF',
+  },
+  restTitle: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  restCountdown: {
+    fontSize: 48,
+    color: '#0A84FF',
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  restSubtitle: {
+    fontSize: 14,
+    color: '#B0BEC5',
+  },
+  routineInfoContainer: {
+    position: 'absolute',
+    top: 100,
+    right: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(138, 184, 255, 0.4)',
+    minWidth: 160,
+  },
+  routineInfoTitle: {
+    fontSize: 14,
+    color: '#8AB8FF',
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  routineInfoText: {
+    fontSize: 12,
+    color: '#E0E0E0',
+    marginBottom: 4,
+    lineHeight: 18,
   },
 });
